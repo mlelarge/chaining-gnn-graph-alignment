@@ -1,0 +1,5 @@
+type: node_embedding_node_pos
+block_inside: block_res_mem
+num_blocks: 2
+in_features: 256
+depth_of_mlp: 2

@@ -1,0 +1,5 @@
+defaults:
+  - dataset: sparse
+  - model: fgnn
+  - training: gpu
+  - pipeline: chain_noseed
