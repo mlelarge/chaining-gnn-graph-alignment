@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from omegaconf import  OmegaConf, DictConfig
 import torch
 import os
+import wandb
 
 from models import get_model, get_siamese, get_siamese_name, train_siamese, test_siamese
 from loaders import siamese_loader, get_data, get_data_test
@@ -42,14 +43,17 @@ class Chaining(Pipeline):
         new = dg.make_data_from_ind_label(data, ind_data)
         return new
 
-    def train_data(self, data_train, data_val, siamese, L=1):
+    def train_data(self, data_train, data_val, siamese, L):
         train_loader = siamese_loader(data_train, batch_size=self.batch_size, shuffle=True)
         val_loader = siamese_loader(data_val, batch_size=self.batch_size, shuffle=False)
         
-        train_siamese(train_loader, val_loader, siamese, self.device, self.path_models, self.cfg.training.epochs, self.cfg.training.log_freq, L=L)
+        train_siamese(train_loader, val_loader, siamese, self.device, self.path_models, self.cfg.training.epochs, self.cfg.training.log_freq, L, self.cfg.training.wandb)
         
         new_train = self.build_ind(data_train, siamese)
         new_val = self.build_ind(data_val, siamese)
+        if self.cfg.training.wandb:
+            wandb.finish()
+            #os.system(f"rm -rf {self.path_models}/wandb")
         return new_train, new_val
 
     def train(self, cfg: DictConfig, path_dataset: str) -> None:
@@ -81,7 +85,7 @@ class Chaining(Pipeline):
         
         for model_name in self.list_models:
             siamese = get_siamese_name(os.path.join(self.path_models,model_name), config['model'])
-            test_siamese(test_loader, siamese, self.device)
+            test_siamese(test_loader, siamese, self.device, self.path_models)
             data_test = self.build_ind(data_test, siamese)
             test_loader = siamese_loader(data_test, batch_size=self.batch_size, shuffle=False)
 

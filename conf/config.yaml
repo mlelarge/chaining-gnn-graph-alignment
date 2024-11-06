@@ -3,3 +3,7 @@ defaults:
   - model: fgnn
   - training: gpu
   - pipeline: chain_noseed
+  - hydra/run : cluster
+  - _self_
+
+root_dir: 
