@@ -8,4 +8,4 @@ log_freq: 5
 use_faq: No
 anew: Yes
 start_model: 'loc model'
-wandb: Yes
+wandb: No

@@ -1,9 +1,9 @@
+root_dir: 
+
 defaults:
+  - _self_
   - dataset: sparse
   - model: fgnn
   - training: gpu
   - pipeline: chain_noseed
-  - hydra/run : cluster
-  - _self_
-
-root_dir: 
+  - hydra/run: mac

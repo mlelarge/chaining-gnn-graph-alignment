@@ -1,0 +1,1 @@
+dir: /Users/lelarge/experiments-gnn-gap/${pipeline.path_models}/outputs/${now:%Y-%m-%d}/${now:%H-%M-%S}
