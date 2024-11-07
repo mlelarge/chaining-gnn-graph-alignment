@@ -2,7 +2,6 @@ from torch.utils.data import DataLoader
 import torch
 import loaders.data_generator as dg
 
-
 def collate_fn(samples_list, temperature=5.):
     input1_list = [input1 for input1, _ , _ in samples_list]
     input2_list = [input2 for _, input2, _ in samples_list]

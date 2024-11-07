@@ -1,5 +1,6 @@
 import os
 import pytorch_lightning as pl
+import torch
 from pytorch_lightning.callbacks import ModelCheckpoint
 from lightning.pytorch.loggers import CSVLogger, WandbLogger
 from models.utils import Network

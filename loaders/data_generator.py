@@ -9,6 +9,7 @@ from more_itertools import chunked
 import toolbox.utils as utils
 from toolbox.metrics import get_ranking
 import copy
+from loaders.load_utils import masking_noseed
 
 GENERATOR_FUNCTIONS = {}
 
@@ -114,19 +115,23 @@ def adjacency_matrix_to_tensor_representation(W):
 def all_perm(loader):
     l_data = []
     for g_bs in loader:
+        mat_id = torch.eye(g_bs[0][0].shape[-1])
         g1 = torch.stack([g[0] for g in g_bs])
         g2 = torch.stack([g[1] for g in g_bs])
         perm = np.random.permutation(g1.shape[-1])
         g1perm = g1[:,:,perm,:][:,:,:,perm]
+        label = torch.stack([mat_id for g in g_bs])
+        labelperm = label[:,perm,:]
         for i in range(g1.shape[0]):
-            l_data.append((g1perm[i,:,:,:], g2[i,:,:,:], torch.tensor(perm, dtype=torch.long)))
+            l_data.append((g1perm[i,:,:,:], g2[i,:,:,:], labelperm[i,:,:]))
     return l_data
 
 class Base_Generator(torch.utils.data.Dataset):
-    def __init__(self, name, path_dataset, num_examples):
+    def __init__(self, name, path_dataset, num_examples, no_seed=True):
         self.path_dataset = path_dataset
         self.name = name
         self.num_examples = num_examples
+        self.no_seed = no_seed
 
     def load_dataset(self):
         """
@@ -150,7 +155,7 @@ class Base_Generator(torch.utils.data.Dataset):
     def remove_file(self):
         os.remove(os.path.join(self.path_dataset, self.name + '.pkl'))
     
-    def create_dataset(self, bs = 10):
+    def create_dataset(self, bs = 5):
         # same permutation for each batch of size bs
         l_data = []
         for _ in tqdm.tqdm(range(self.num_examples)):
@@ -160,7 +165,10 @@ class Base_Generator(torch.utils.data.Dataset):
 
     def __getitem__(self, i):
         """ Fetch sample at index i """
-        return self.data[i]
+        if self.no_seed:
+            return (masking_noseed(self.data[i][0]), masking_noseed(self.data[i][1]), self.data[i][2])
+        else:
+            return self.data[i]
 
     def __len__(self):
         """ Get dataset length """
