@@ -1,0 +1,9 @@
+root_dir: 
+
+defaults:
+  - _self_
+  - dataset: large
+  - model: fgnn
+  - training: stream
+  - pipeline: chain_noseed
+  - hydra/run: mac

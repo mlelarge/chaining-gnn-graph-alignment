@@ -1,0 +1,11 @@
+n_vertices: 100
+generative_model: ErdosRenyi
+noise_model: ErdosRenyi
+edge_density: 0.04
+noise: 0.22
+train:
+  num_examples: 200
+val:
+  num_examples: 20
+test:
+  num_examples: 100

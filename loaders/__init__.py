@@ -13,11 +13,11 @@ def siamese_loader(data, batch_size, shuffle=True):
     return DataLoader(data, batch_size=batch_size, shuffle=shuffle,
                                         num_workers=8, collate_fn=collate_fn)
 
-def get_data(cfg_data, path_dataset):
+def get_data(cfg_data, path_dataset, saving=True):
     generator = dg.GAP_Generator
-    gene_train = generator('train', cfg_data, path_dataset)
+    gene_train = generator('train', cfg_data, path_dataset, saving=saving)
     gene_train.load_dataset()
-    gene_val = generator('val', cfg_data, path_dataset)
+    gene_val = generator('val', cfg_data, path_dataset,saving=True)
     gene_val.load_dataset()
     return gene_train, gene_val
 
