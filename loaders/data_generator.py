@@ -127,11 +127,12 @@ def all_perm(loader):
     return l_data
 
 class Base_Generator(torch.utils.data.Dataset):
-    def __init__(self, name, path_dataset, num_examples, no_seed=True):
+    def __init__(self, name, path_dataset, num_examples, no_seed, saving):
         self.path_dataset = path_dataset
         self.name = name
         self.num_examples = num_examples
         self.no_seed = no_seed
+        self.saving = saving
 
     def load_dataset(self):
         """
@@ -148,8 +149,10 @@ class Base_Generator(torch.utils.data.Dataset):
         else:
             print('Creating dataset at {}'.format(path))
             l_data = self.create_dataset()
-            print('Saving dataset at {}'.format(path))
-            torch.save(l_data, path)
+            if self.saving:
+                print('Saving dataset at {}'.format(path))
+                utils.check_dir(self.path_dataset)
+                torch.save(l_data, path)
             self.data = l_data
     
     def remove_file(self):
@@ -166,9 +169,9 @@ class Base_Generator(torch.utils.data.Dataset):
     def __getitem__(self, i):
         """ Fetch sample at index i """
         if self.no_seed:
-            return (masking_noseed(self.data[i][0]), masking_noseed(self.data[i][1]), self.data[i][2])
-        else:
-            return self.data[i]
+            masking_noseed(self.data[i][0])
+            masking_noseed(self.data[i][1] )   
+        return self.data[i]
 
     def __len__(self):
         """ Get dataset length """
@@ -179,7 +182,7 @@ class GAP_Generator(Base_Generator):
     """
     Build a numpy dataset of pairs of (Graph, noisy Graph)
     """
-    def __init__(self, name, cfg_data, path_dataset):
+    def __init__(self, name, cfg_data, path_dataset,no_seed=True, saving=True):
         self.generative_model = cfg_data.generative_model
         self.noise_model = cfg_data.noise_model
         self.edge_density = cfg_data.edge_density
@@ -188,10 +191,8 @@ class GAP_Generator(Base_Generator):
         self.n_vertices = cfg_data.n_vertices
         subfolder_name = f"GAP_{self.generative_model}_{self.noise_model}_{num_examples}_{self.n_vertices}_{self.noise}_{self.edge_density}"
         path_dataset = os.path.join(path_dataset, subfolder_name)
-        super().__init__(name, path_dataset, num_examples)
+        super().__init__(name, path_dataset, num_examples, no_seed, saving)
         self.data = []
-        
-        utils.check_dir(self.path_dataset)
 
     def compute_example(self):
         """

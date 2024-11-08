@@ -1,4 +1,4 @@
-root_dir: 
+root_dir: /scratch/lelarge/ 
 
 defaults:
   - _self_
