@@ -3,6 +3,7 @@ from omegaconf import  OmegaConf, DictConfig
 import torch
 import os
 import wandb
+from typing import Optional
 
 from models import get_model, get_siamese, get_siamese_name, train_siamese, test_siamese
 from loaders import siamese_loader, get_data, get_data_test
@@ -37,11 +38,14 @@ class Chaining(Pipeline):
     def __init__(self, num_models: int,  path_models: str):
         super().__init__(num_models, path_models)
 
-    def build_ind(self, data, siamese):
+    def build_ind(self, data, siamese, verbose=False):
         loader = siamese_loader(data, batch_size=self.batch_size, shuffle=False)
         ind_data = dg.all_ind(loader, siamese, self.device)
         new = dg.make_data_from_ind_label(data, ind_data)
-        return new
+        if verbose:
+            return new, ind_data
+        else:
+            return new, None
 
     def train_data(self, data_train, data_val, siamese, L):
         train_loader = siamese_loader(data_train, batch_size=self.batch_size, shuffle=True)
@@ -49,7 +53,7 @@ class Chaining(Pipeline):
         
         train_siamese(train_loader, val_loader, siamese, self.device, self.path_models, self.cfg.training.epochs, self.cfg.training.log_freq, L, self.cfg.training.wandb)
         
-        new_train = self.build_ind(data_train, siamese)
+        new_train, _ = self.build_ind(data_train, siamese)
         new_val = self.build_ind(data_val, siamese)
         if self.cfg.training.wandb:
             wandb.finish()
@@ -76,7 +80,10 @@ class Chaining(Pipeline):
         for i in range(1, self.num_models):
             new_train, new_val = self.train_data(new_train, new_val, siamese, L=i)
 
-    def loop(self, cfg_data: DictConfig, path_dataset: str):
+    def loop(self, cfg_data: DictConfig, path_dataset: str, 
+                L :  int | None = None, 
+                N_max : int | None = None,
+                verbose : bool = False):
         config = load_json(os.path.join(self.path_models, 'config.json'))
         data_test = get_data_test(cfg_data, path_dataset)
         self.batch_size = config['training']['batch_size']
@@ -84,11 +91,33 @@ class Chaining(Pipeline):
 
         self.list_models = sorted([file for file in os.listdir(self.path_models) if file.endswith('.ckpt')])
         
-        for model_name in self.list_models:
+        if L:
+            L = min(L, self.num_models)
+        else:
+            L = self.num_models
+
+        if verbose:
+            all_ind_data = []
+
+        for model_name in self.list_models[:L]:
             siamese = get_siamese_name(os.path.join(self.path_models,model_name), config['model'])
             test_siamese(test_loader, siamese, self.device, self.path_models)
-            data_test = self.build_ind(data_test, siamese)
+            data_test, current_ind = self.build_ind(data_test, siamese, verbose)
+            if verbose:
+                all_ind_data.append(current_ind)
             test_loader = siamese_loader(data_test, batch_size=self.batch_size, shuffle=False)
+        
+        if N_max:
+            for i in range(N_max):
+                test_siamese(test_loader, siamese, self.device, self.path_models)
+                data_test, current_ind = self.build_ind(data_test, siamese, verbose)
+                if verbose:
+                    all_ind_data.append(current_ind)
+                test_loader = siamese_loader(data_test, batch_size=self.batch_size, shuffle=False)
+
+        if verbose:
+            return all_ind_data
+
 
 class Streaming(Pipeline):
     def __init__(self, num_models: int,  path_models: str):

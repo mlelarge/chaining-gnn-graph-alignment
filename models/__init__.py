@@ -1,7 +1,7 @@
 import os
 import pytorch_lightning as pl
 import torch
-from pytorch_lightning.callbacks import ModelCheckpoint
+from pytorch_lightning.callbacks import ModelCheckpoint, LearningRateMonitor
 from lightning.pytorch.loggers import CSVLogger, WandbLogger
 from models.utils import Network
 from models.block_net import node_embedding_node_pos, block_res_mem
@@ -49,13 +49,14 @@ def train_siamese(train_loader, val_loader, siamese, device, path_models, max_ep
     checkpoint_callback = ModelCheckpoint(save_top_k=1, mode='max', 
             monitor="val_acc", dirpath=path_models,
             filename=model_name+'-{epoch}-{val_loss:.2f}-{val_acc:.2f}')
+    lr_monitor = LearningRateMonitor(logging_interval='epoch')
     if wandb:
         project_name = os.path.basename(path_models.rstrip(os.sep))
         logger = WandbLogger(project=project_name, name=model_name, save_dir=path_models)
     else:
         logger = CSVLogger(path_models, name=model_name)
     trainer = pl.Trainer(accelerator=device, max_epochs=max_epochs, precision='16-mixed', logger=logger,
-                    log_every_n_steps=log_every_n_steps, callbacks=[checkpoint_callback])
+                    log_every_n_steps=log_every_n_steps, callbacks=[checkpoint_callback, lr_monitor],)
     trainer.fit(siamese, train_loader, val_loader)
 
 def test_siamese(test_loader, siamese, device, path_models):

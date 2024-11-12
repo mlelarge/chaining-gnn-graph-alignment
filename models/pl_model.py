@@ -62,7 +62,7 @@ class Siamese_Node(pl.LightningModule):
         return {
         "optimizer": optimizer,
         "lr_scheduler": {
-            "scheduler": torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, factor=self.scheduler_decay, patience=self.scheduler_step, verbose=True, min_lr=self.lr_stop),
+            "scheduler": torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, factor=self.scheduler_decay, patience=self.scheduler_step, min_lr=self.lr_stop),
             "monitor": "val_loss",
             "frequency": 1
             # If "monitor" references validation metrics, then "frequency" should be set to a

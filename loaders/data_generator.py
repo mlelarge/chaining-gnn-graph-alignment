@@ -227,7 +227,6 @@ def all_ind(loader, model, device, use_faq = False, random_order=False):
             for i, weight in enumerate(weights):
                 ind1, col_ind = get_ranking(weight.numpy(), g1[i], g2[i], use_faq)
                 if random_order:
-                    #print(len(ind1))
                     ind1 = np.random.permutation(len(ind1))
                 ind2 = col_ind[ind1]
                 ind_data.append((ind1,ind2))
