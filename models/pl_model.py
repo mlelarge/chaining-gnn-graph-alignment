@@ -15,7 +15,7 @@ class Siamese_Node(pl.LightningModule):
         self.loss = nn.CrossEntropyLoss(reduction='mean')
         self.metric = accuracy_max 
 
-    def set_training_mode(self, lr=1e-3, scheduler_decay=0.5, scheduler_step=3, lr_stop = 1e-5):
+    def set_training_mode(self, lr=1e-3, scheduler_decay=0.5, scheduler_step=3, lr_stop = 2e-5):
         self.lr = lr
         self.scheduler_decay = scheduler_decay
         self.scheduler_step = scheduler_step
