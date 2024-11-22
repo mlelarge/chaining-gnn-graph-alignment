@@ -51,7 +51,7 @@ class Chaining(Pipeline):
         train_loader = siamese_loader(data_train, batch_size=self.batch_size, shuffle=True)
         val_loader = siamese_loader(data_val, batch_size=self.batch_size, shuffle=False)
         
-        train_siamese(train_loader, val_loader, siamese, self.device, self.path_models, self.cfg.training.epochs, self.cfg.training.log_freq, L, self.cfg.training.wandb)
+        train_siamese(train_loader, val_loader, siamese, self.device, self.path_models, self.cfg.training.epochs, self.cfg.training.log_freq, L, self.cfg.training.lr_stop, self.cfg.training.wandb)
         
         new_train, _ = self.build_ind(data_train, siamese)
         new_val, _ = self.build_ind(data_val, siamese)
@@ -127,7 +127,7 @@ class Streaming(Pipeline):
         train_loader = siamese_loader(data_train, batch_size=self.batch_size, shuffle=True)
         val_loader = siamese_loader(data_val, batch_size=self.batch_size, shuffle=False)
         
-        train_siamese(train_loader, val_loader, siamese, self.device, self.path_models, self.cfg.training.epochs, self.cfg.training.log_freq, L, self.cfg.training.wandb)
+        train_siamese(train_loader, val_loader, siamese, self.device, self.path_models, self.cfg.training.epochs, self.cfg.training.log_freq, L, self.cfg.training.lr_stop, self.cfg.training.wandb)
         
         if self.cfg.training.wandb:
             wandb.finish()

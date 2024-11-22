@@ -3,7 +3,7 @@ batch_size:  6
 lr: !!float 1e-4
 scheduler_step: 3
 scheduler_decay: 0.5
-lr_stop: !!float 1e-7
+lr_stop: !!float 1e-5
 log_freq: 5
 use_faq: No
 anew: Yes
