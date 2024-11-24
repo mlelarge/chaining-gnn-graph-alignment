@@ -52,7 +52,8 @@ def train_siamese(train_loader, val_loader, siamese, device, path_models, max_ep
     lr_monitor = LearningRateMonitor(logging_interval='epoch')
     monitor_key = 'lr-Adam'
     lr_es = EarlyStopping(
-        monitor=monitor_key, mode="min", stopping_threshold=lr_stop, check_on_train_epoch_end=True
+        monitor=monitor_key, mode="min", stopping_threshold=lr_stop, 
+        patience=100, check_on_train_epoch_end=True
     )
     if wandb:
         project_name = os.path.basename(path_models.rstrip(os.sep))

@@ -19,7 +19,7 @@ class Siamese_Node(pl.LightningModule):
         self.lr = lr
         self.scheduler_decay = scheduler_decay
         self.scheduler_step = scheduler_step
-        self.lr_stop = lr_stop
+        self.lr_stop = lr_stop/2 # for optimizer to enable earlystopping
         
     def forward(self, x1, x2 , verbose =False):
         """
