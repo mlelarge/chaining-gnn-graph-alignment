@@ -15,7 +15,7 @@ def main(cfg: DictConfig):
     PB_DIR = os.path.join(ROOT_DIR,'experiments-gnn-gap/')
     DATA_PB_DIR = os.path.join(PB_DIR,'data/')
     path_models = os.path.join(PB_DIR, cfg.pipeline.path_models)
-    chain = Chaining(cfg.pipeline.L, path_models)
+    chain = Chaining(path_models, cfg.pipeline.L)
     chain.train(cfg, DATA_PB_DIR)
     chain.loop(cfg.dataset, DATA_PB_DIR)
 

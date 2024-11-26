@@ -64,7 +64,8 @@ def train_siamese(train_loader, val_loader, siamese, device, path_models, max_ep
                     log_every_n_steps=log_every_n_steps, callbacks=[checkpoint_callback, lr_monitor, lr_es],)
     trainer.fit(siamese, train_loader, val_loader)
 
-def test_siamese(test_loader, siamese, device, path_models):
-    logger = CSVLogger(path_models)
+def test_siamese(test_loader, siamese, device, path_logs):
+    logger = CSVLogger(path_logs)
     trainer = pl.Trainer(accelerator=device, logger=logger)
     trainer.test(siamese, test_loader)
+    return trainer.callback_metrics['test_acc']

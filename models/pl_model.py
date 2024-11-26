@@ -55,6 +55,7 @@ class Siamese_Node(pl.LightningModule):
         self.log('test_loss', loss)
         (acc,n) = self.metric(raw_scores, batch[2])
         self.log("test_acc", acc/n)
+        return acc/n
     
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), lr=self.lr,

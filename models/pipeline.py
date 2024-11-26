@@ -11,10 +11,16 @@ import loaders.data_generator as dg
 from toolbox.utils import save_json, load_json
 
 class Pipeline(ABC):
-    def __init__(self, num_models: int,  path_models: str):
-        self.num_models = num_models
+    def __init__(self, path_models: str, num_models: int | None = None):
+        
         self.path_models = path_models
-        self.list_models = []
+        if num_models:
+            self.num_models = num_models
+            self.list_models = []
+        else:
+            self.list_models = sorted([file for file in os.listdir(self.path_models) if file.endswith('.ckpt')])
+            self.num_models = len(self.list_models)
+        
         self.set_device()
 
     def set_device(self):
@@ -35,8 +41,8 @@ class Pipeline(ABC):
     #    pass
 
 class Chaining(Pipeline):
-    def __init__(self, num_models: int,  path_models: str):
-        super().__init__(num_models, path_models)
+    def __init__(self, path_models: str, num_models: int | None = None):
+        super().__init__(path_models, num_models)
 
     def build_ind(self, data, siamese, verbose=False):
         loader = siamese_loader(data, batch_size=self.batch_size, shuffle=False)
@@ -80,17 +86,24 @@ class Chaining(Pipeline):
         for i in range(1, self.num_models):
             new_train, new_val = self.train_data(new_train, new_val, siamese, L=i)
 
-    def loop(self, cfg_data: DictConfig, path_dataset: str, 
+    def loop(self, cfg_data: DictConfig, 
+                path_dataset: str, 
                 L :  int | None = None, 
                 N_max : int | None = None,
+                patience : int = 3,
+                path_logs: str | None = None,
                 verbose : bool = False):
         config = load_json(os.path.join(self.path_models, 'config.json'))
         data_test = get_data_test(cfg_data, path_dataset)
         self.batch_size = config['training']['batch_size']
         test_loader = siamese_loader(data_test, batch_size=self.batch_size, shuffle=False)
-
-        self.list_models = sorted([file for file in os.listdir(self.path_models) if file.endswith('.ckpt')])
         
+        if path_logs:
+            self.path_logs = path_logs
+        else:
+            self.path_logs = self.path_models
+        print(f"Path for logs: {self.path_logs}")
+
         if L:
             L = min(L, self.num_models)
         else:
@@ -99,17 +112,33 @@ class Chaining(Pipeline):
         if verbose:
             all_ind_data = []
 
+        current_max_acc = 0
         for model_name in self.list_models[:L]:
             siamese = get_siamese_name(os.path.join(self.path_models,model_name), config['model'])
-            test_siamese(test_loader, siamese, self.device, self.path_models)
+            test_acc = test_siamese(test_loader, siamese, self.device, self.path_logs)
+            print(f"Model {model_name} has test accuracy: {test_acc}")
+            if test_acc > current_max_acc:
+                current_max_acc = test_acc
+                best_model = siamese
+                best_ind = data_test
             data_test, current_ind = self.build_ind(data_test, siamese, verbose)
             if verbose:
                 all_ind_data.append(current_ind)
             test_loader = siamese_loader(data_test, batch_size=self.batch_size, shuffle=False)
         
         if N_max:
+            stop = patience
             for i in range(N_max):
-                test_siamese(test_loader, siamese, self.device, self.path_models)
+                test_acc = test_siamese(test_loader, siamese, self.device, self.path_logs)
+                if test_acc > current_max_acc:
+                    current_max_acc = test_acc
+                    best_model = siamese
+                    best_data = data_test
+                    stop = patience
+                else:
+                    stop -= 1
+                    if stop == 0:
+                        break
                 data_test, current_ind = self.build_ind(data_test, siamese, verbose)
                 if verbose:
                     all_ind_data.append(current_ind)
@@ -117,11 +146,13 @@ class Chaining(Pipeline):
 
         if verbose:
             return all_ind_data
+        else:
+            return best_model, best_data
 
 
 class Streaming(Pipeline):
-    def __init__(self, num_models: int,  path_models: str):
-        super().__init__(num_models, path_models)
+    def __init__(self, path_models: str, num_models: int | None = None):
+        super().__init__(path_models, num_models)
 
     def train_data(self, data_train, data_val, siamese, L):
         train_loader = siamese_loader(data_train, batch_size=self.batch_size, shuffle=True)
