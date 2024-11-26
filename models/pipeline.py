@@ -90,7 +90,7 @@ class Chaining(Pipeline):
                 path_dataset: str, 
                 L :  int | None = None, 
                 N_max : int | None = None,
-                patience : int = 3,
+                patience : int = 4,
                 path_logs: str | None = None,
                 verbose : bool = False):
         config = load_json(os.path.join(self.path_models, 'config.json'))
@@ -120,7 +120,7 @@ class Chaining(Pipeline):
             if test_acc > current_max_acc:
                 current_max_acc = test_acc
                 best_model = siamese
-                best_ind = data_test
+                best_data = data_test
             data_test, current_ind = self.build_ind(data_test, siamese, verbose)
             if verbose:
                 all_ind_data.append(current_ind)
