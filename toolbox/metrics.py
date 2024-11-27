@@ -37,6 +37,14 @@ def perm2mat(p):
         P[i, p[i]] = 1
     return P
 
+def get_perm(ind_pair):
+    ind0, ind1 = ind_pair
+    perm = np.zeros(len(ind0))
+    for i,j in enumerate(ind0):
+        perm[j] = ind1[i]
+    perm = np.int32(perm)
+    return perm
+
 def get_ranking(weight, graph1, graph2, use_faq = False):
     if use_faq:
         Pp = perm2mat(col_ind)

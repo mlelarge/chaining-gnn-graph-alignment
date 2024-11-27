@@ -66,6 +66,6 @@ def train_siamese(train_loader, val_loader, siamese, device, path_models, max_ep
 
 def test_siamese(test_loader, siamese, device, path_logs):
     logger = CSVLogger(path_logs)
-    trainer = pl.Trainer(accelerator=device, logger=logger)
+    trainer = pl.Trainer(accelerator=device, precision='16-mixed', logger=logger)
     trainer.test(siamese, test_loader)
     return trainer.callback_metrics['test_acc']

@@ -7,7 +7,7 @@ import os
 import tqdm
 from more_itertools import chunked
 import toolbox.utils as utils
-from toolbox.metrics import get_ranking
+from toolbox.metrics import get_ranking, get_perm
 import copy
 from loaders.load_utils import masking_noseed
 
@@ -212,27 +212,37 @@ class GAP_Generator(Base_Generator):
         B_noise = adjacency_matrix_to_tensor_representation(W_noise)
         return (B, B_noise)
 
-def all_ind(loader, model, device, use_faq = False, random_order=False):
+def all_ind(loader, model, device, compute_acc = False, random_order=False):
     ind_data = []
     model = model.to(device)
+    all_acc = []
     with torch.no_grad():
-        for (data1, data2, _) in loader:
+        for (data1, data2, labels) in loader:
             data1['input'] = data1['input'].to(device)
             data2['input'] = data2['input'].to(device)
+            n_vertices = data1['input'].shape[-1]
             rawscores = model(data1, data2)
             rawscores = rawscores.to(torch.float32).cpu().detach()
             weights = torch.log_softmax(rawscores,-1)
             g1 = copy.deepcopy(data1['input'][:,0,:,:].cpu().detach().numpy())
             g2 = copy.deepcopy(data2['input'][:,0,:,:].cpu().detach().numpy())
             for i, weight in enumerate(weights):
-                ind1, col_ind = get_ranking(weight.numpy(), g1[i], g2[i], use_faq)
+                ind1, col_ind = get_ranking(weight.numpy(), g1[i], g2[i])
                 if random_order:
                     ind1 = np.random.permutation(len(ind1))
                 ind2 = col_ind[ind1]
                 ind_data.append((ind1,ind2))
+                if compute_acc:
+                    perm = get_perm((ind1, ind2))
+                    label_np = np.argmax(labels[i].cpu().detach().numpy(),1)
+                    all_acc.append(np.sum(perm == label_np)/n_vertices)
             del g1
             del g2
-    return ind_data
+    if compute_acc:
+        all_acc = np.array(all_acc)
+        return ind_data, np.mean(all_acc)
+    else:
+        return ind_data, None
 
 
 def adjacency_matrix_to_tensor_representation_ind(W , ind=None):
