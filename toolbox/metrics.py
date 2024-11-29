@@ -84,12 +84,14 @@ def accuracy_linear_assignment(rawscores, labels=None, aggregate_score=True):
     else:
         return all_acc
 
-def all_qap_chain(loader, model, device):
+def all_qap_chain(loader, model, device, verbose=False):
     all_qap = []
     all_d = []
     all_planted = []
     all_acc = []
     all_accd = []
+    all_nit = []
+    all_accmax = []
     for batch in loader:
         (data1, data2, target) = batch
         data1['input'] = data1['input'].to(device)
@@ -102,20 +104,24 @@ def all_qap_chain(loader, model, device):
         planted = target.cpu().detach().numpy()
         
         n = len(planted[0])
-        #bs = planted.shape[0]
         
         for i, weight in enumerate(weights):
             if planted[i].ndim == 2:
                 pl = np.argmax(planted[i],1)
             cost = -weight.cpu().detach().numpy()
+            col_max = np.argmax(-cost,1)
             row_ind, col_ind = linear_sum_assignment(cost)
             Pp = perm2mat(col_ind)
             res_qap = quadratic_assignment(g1[i],-g2[i],method='faq',options={'P0':Pp})
-            #P_qap = perm2mat(res_qap['col_ind'])
-            #P_planted = perm2mat(pl)            
             all_planted.append((g1[i]*g2[i][pl,:][:, pl]).sum()/2)
             all_qap.append((g1[i]*g2[i][res_qap['col_ind'],:][:, res_qap['col_ind']]).sum()/2)
             all_d.append((g1[i]*g2[i][col_ind,:][:, col_ind]).sum()/2)
             all_acc.append(np.sum(pl==res_qap['col_ind'])/n)
             all_accd.append(np.sum(pl==col_ind)/n)
-    return np.array(all_planted), np.array(all_qap), np.array(all_d), np.array(all_acc), np.array(all_accd)
+            all_accmax.append(np.sum(pl==col_max)/n)
+            if verbose:
+                all_nit.append(res_qap['nit'])
+    if verbose:
+        return np.array(all_planted), np.array(all_qap), np.array(all_d), np.array(all_acc), np.array(all_accd), np.array(all_accmax), np.array(all_nit)
+    else:
+        return np.array(all_planted), np.array(all_qap), np.array(all_d), np.array(all_acc), np.array(all_accd), np.array(all_accmax)

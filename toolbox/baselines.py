@@ -43,7 +43,7 @@ def fro_norm(P, A, B):
 def indef_rel(P, A, B):
     return -np.trace(np.transpose(A@P)@(P@B))
 
-def relaxed_normAPPB_FW_seeds(A, B, max_iter=1000, seeds=0):
+def relaxed_normAPPB_FW_seeds(A, B, max_iter=1000, seeds=0, verbose=False):
     AtA = np.dot(A.T, A)
     BBt = np.dot(B, B.T)
     p = A.shape[0]
@@ -52,7 +52,7 @@ def relaxed_normAPPB_FW_seeds(A, B, max_iter=1000, seeds=0):
         return np.linalg.norm(np.dot(A, P) - np.dot(P, B), ord='fro') ** 2
     
     tol = 5e-2
-    tol2 = 1e-5
+    tol2 = 1e-3
     
     P = np.ones((p, p)) / (p - seeds)
     P[:seeds, :seeds] = np.eye(seeds)
@@ -93,9 +93,12 @@ def relaxed_normAPPB_FW_seeds(A, B, max_iter=1000, seeds=0):
     
     _, col_ind = linear_sum_assignment(-P.T)
     
-    return P.T, col_ind
+    if verbose:
+        return P.T, col_ind, s
+    else:
+        return P.T, col_ind, None
 
-def all_qap_scipy(loader, max_iter = 1000, seeds = 0):
+def all_qap_scipy(loader, max_iter = 1000, maxiter_faq=30, seeds = 0, verbose=False):
     all_qap = []
     all_d = []
     all_planted = []
@@ -105,6 +108,8 @@ def all_qap_scipy(loader, max_iter = 1000, seeds = 0):
     all_fproj = []
     all_fqap = []
     all_fplanted = []
+    all_conv_nit = []
+    all_nit =[]
     for batch in loader:
         (data1, data2, target) = batch
         g1 = data1['input'][:,0,:,:].cpu().detach().numpy()
@@ -117,19 +122,26 @@ def all_qap_scipy(loader, max_iter = 1000, seeds = 0):
         for i in range(bs):
             if planted[i].ndim == 2:
                 pl = np.argmax(planted[i],0)
-            P, col = relaxed_normAPPB_FW_seeds(g1[i],g2[i], max_iter=max_iter, seeds=seeds)
+            P, col, s = relaxed_normAPPB_FW_seeds(g1[i],g2[i], max_iter=max_iter, seeds=seeds, verbose=verbose)
+            if verbose:
+                all_conv_nit.append(s)
             Pp = perm2mat(col)
             all_fd.append(fro_norm(P, g1[i], g2[i]))
             all_fproj.append(fro_norm(Pp, g1[i],g2[i]))
-            res_qap = quadratic_assignment(g2[i],-g1[i],method='faq',options={'P0':P})
+            res_qap = quadratic_assignment(g2[i],-g1[i],method='faq',options={"P0": P, "maxiter": maxiter_faq})
             P_qap = perm2mat(res_qap['col_ind'])
             all_fqap.append(fro_norm(P_qap, g1[i], g2[i]))
             P_planted = perm2mat(pl)
             all_fplanted.append(fro_norm(P_planted, g1[i],g2[i]))
             
-            all_planted.append((g1[i]*g2[i][pl,:][:, pl]).sum()/2)
+            all_planted.append((g2[i]*g1[i][pl,:][:, pl]).sum()/2)
             all_qap.append((g2[i]*g1[i][res_qap['col_ind'],:][:, res_qap['col_ind']]).sum()/2)
             all_d.append((g2[i]*g1[i][col,:][:, col]).sum()/2)
             all_acc.append(np.sum(pl==res_qap['col_ind'])/n)
             all_accd.append(np.sum(pl==col)/n)
-    return all_planted, all_qap, all_d, all_acc, all_accd, all_fd, all_fproj, all_fqap, all_fplanted
+            if verbose:
+                all_nit.append(res_qap['nit'])
+    if verbose:
+        return np.array(all_planted), np.array(all_qap), np.array(all_d), np.array(all_acc), np.array(all_accd), np.array(all_fd), np.array(all_fproj), np.array(all_fqap), np.array(all_fplanted), np.array(all_conv_nit), np.array(all_nit)
+    else:
+        return np.array(all_planted), np.array(all_qap), np.array(all_d), np.array(all_acc), np.array(all_accd), np.array(all_fd), np.array(all_fproj), np.array(all_fqap), np.array(all_fplanted)

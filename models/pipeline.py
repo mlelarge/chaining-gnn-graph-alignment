@@ -5,7 +5,7 @@ import os
 import wandb
 from typing import Optional
 
-from models import get_model, get_siamese, get_siamese_name, train_siamese #, test_siamese
+from models import get_model, get_siamese, get_siamese_name, train_siamese
 from loaders import siamese_loader, get_data, get_data_test
 import loaders.data_generator as dg
 from toolbox.utils import save_json, load_json
@@ -90,8 +90,7 @@ class Chaining(Pipeline):
                 path_dataset: str, 
                 L :  int | None = None, 
                 N_max : int | None = None,
-                patience : int = 4,
-                #path_logs: str | None = None,
+                patience : int = 10, #4
                 verbose : bool = False,
                 eps : float = 0.001):
         config = load_json(os.path.join(self.path_models, 'config.json'))
@@ -99,12 +98,6 @@ class Chaining(Pipeline):
         self.batch_size = config['training']['batch_size']
         test_loader = siamese_loader(data_test, batch_size=self.batch_size, shuffle=False)
         
-        #if path_logs:
-        #    self.path_logs = path_logs
-        #else:
-        #    self.path_logs = self.path_models
-        #print(f"Path for logs: {self.path_logs}")
-
         if L:
             L = min(L, self.num_models)
         else:
@@ -114,18 +107,19 @@ class Chaining(Pipeline):
             all_ind_data = []
 
         current_max_acc = 0
+        best_nloop = 0
         stop = patience
         eps = eps
-        for model_name in self.list_models[:L]:
+        for (nloop, model_name) in enumerate(self.list_models[:L]):
             siamese = get_siamese_name(os.path.join(self.path_models,model_name), config['model'])
             new_data_test, current_ind, test_acc = self.build_ind(data_test, siamese, verbose, compute_acc=True)
-            #test_siamese(test_loader, siamese, self.device, self.path_logs)
             print(f"Model {model_name} has test accuracy: {test_acc}")
             delta = test_acc - current_max_acc
             if delta > 0:
                 current_max_acc = test_acc
                 best_model = siamese
                 best_data = data_test
+                best_nloop = nloop
             if delta > eps:
                 stop = patience
             else:
@@ -140,14 +134,15 @@ class Chaining(Pipeline):
         
         if N_max and stop >0:
             for i in range(N_max):
-                new_data_test, current_ind, test_acc = self.build_ind(data_test, siamese, verbose, compute_acc=True)
+                new_data_test, current_ind, all_acc = self.build_ind(data_test, siamese, verbose, compute_acc=True)
+                test_Acc = all_acc.mean()
                 print(f"Model {model_name}-{i} has test accuracy: {test_acc}")
-                #test_acc = test_siamese(test_loader, siamese, self.device, self.path_logs)
                 delta = test_acc - current_max_acc
                 if delta > 0:
                     current_max_acc = test_acc
                     best_model = siamese
                     best_data = data_test
+                    best_nloop += 1
                 if delta > eps:
                     stop = patience
                 else:
@@ -160,9 +155,9 @@ class Chaining(Pipeline):
                 test_loader = siamese_loader(data_test, batch_size=self.batch_size, shuffle=False)
 
         if verbose:
-            return all_ind_data
+            return all_ind_data, best_model, best_data, best_nloop
         else:
-            return best_model, best_data
+            return best_model, best_data, best_nloop
 
 
 class Streaming(Pipeline):
