@@ -240,7 +240,7 @@ def all_ind(loader, model, device, compute_acc = False, random_order=False):
             del g2
     if compute_acc:
         all_acc = np.array(all_acc)
-        return ind_data, np.mean(all_acc)
+        return ind_data, all_acc
     else:
         return ind_data, None
 

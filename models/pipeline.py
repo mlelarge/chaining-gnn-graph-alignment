@@ -112,7 +112,8 @@ class Chaining(Pipeline):
         eps = eps
         for (nloop, model_name) in enumerate(self.list_models[:L]):
             siamese = get_siamese_name(os.path.join(self.path_models,model_name), config['model'])
-            new_data_test, current_ind, test_acc = self.build_ind(data_test, siamese, verbose, compute_acc=True)
+            new_data_test, current_ind, all_acc = self.build_ind(data_test, siamese, verbose, compute_acc=True)
+            test_acc = all_acc.mean()
             print(f"Model {model_name} has test accuracy: {test_acc}")
             delta = test_acc - current_max_acc
             if delta > 0:
@@ -135,7 +136,7 @@ class Chaining(Pipeline):
         if N_max and stop >0:
             for i in range(N_max):
                 new_data_test, current_ind, all_acc = self.build_ind(data_test, siamese, verbose, compute_acc=True)
-                test_Acc = all_acc.mean()
+                test_acc = all_acc.mean()
                 print(f"Model {model_name}-{i} has test accuracy: {test_acc}")
                 delta = test_acc - current_max_acc
                 if delta > 0:

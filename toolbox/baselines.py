@@ -52,7 +52,7 @@ def relaxed_normAPPB_FW_seeds(A, B, max_iter=1000, seeds=0, verbose=False):
         return np.linalg.norm(np.dot(A, P) - np.dot(P, B), ord='fro') ** 2
     
     tol = 5e-2
-    tol2 = 1e-3
+    tol2 = 1e-4
     
     P = np.ones((p, p)) / (p - seeds)
     P[:seeds, :seeds] = np.eye(seeds)

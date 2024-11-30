@@ -31,7 +31,7 @@ def main(cfg: DictConfig):
     DATA_PB_DIR = os.path.join(PB_DIR,'data/')
     path_logs = os.path.join(PB_DIR, cfg.path_logs)
     check_dir(path_logs)
-    faq_file = os.path.join(path_logs, f"5000_faq_noise{cfg.noise}_chunk{cfg.chunk}.npy")
+    faq_file = os.path.join(path_logs, f"5000n_faq_noise{cfg.noise}_chunk{cfg.chunk}.npy")
 
     all_planted, all_qap, all_d, all_acc, all_accd, all_fd, all_fproj, all_fqap, all_fplanted, all_conv_nit, all_nit = make_chunk_faq(cfg.noise, cfg.chunk, cfg.dataset, DATA_PB_DIR)
     np.save(faq_file, [all_planted, all_qap, all_d, all_acc, all_accd, all_fd, all_fproj, all_fqap, all_fplanted, all_conv_nit, all_nit])

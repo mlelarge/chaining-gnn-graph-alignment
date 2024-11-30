@@ -22,8 +22,8 @@ def main(cfg: DictConfig):
     name_file = os.path.join(path_logs, f"new_results.npy")
     chain = Chaining(path_models)
     
-    #list_noises = [0, 0.05, 0.1, 0.15, 0.2, 0.25 , 0.3, 0.35]
-    list_noises = [0, 0.05, 0.1, 0.15, 0.2]
+    list_noises = [0, 0.05, 0.1, 0.15, 0.2, 0.25 , 0.3, 0.35]
+    #list_noises = [0, 0.05, 0.1, 0.15, 0.2]
     l = len(list_noises)
     n_ex = cfg.dataset.test.num_examples
     ALL_qap = np.zeros((l,n_ex))
