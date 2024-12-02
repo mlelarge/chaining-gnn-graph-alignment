@@ -212,12 +212,12 @@ class GAP_Generator(Base_Generator):
         B_noise = adjacency_matrix_to_tensor_representation(W_noise)
         return (B, B_noise)
 
-def all_ind(loader, model, device, compute_acc = False, random_order=False):
+def all_ind(loader, model, device, compute_nce = False, random_order=False):
     ind_data = []
     model = model.to(device)
-    all_acc = []
+    all_nce = []
     with torch.no_grad():
-        for (data1, data2, labels) in loader:
+        for (data1, data2, _) in loader:
             data1['input'] = data1['input'].to(device)
             data2['input'] = data2['input'].to(device)
             n_vertices = data1['input'].shape[-1]
@@ -232,15 +232,13 @@ def all_ind(loader, model, device, compute_acc = False, random_order=False):
                     ind1 = np.random.permutation(len(ind1))
                 ind2 = col_ind[ind1]
                 ind_data.append((ind1,ind2))
-                if compute_acc:
-                    perm = get_perm((ind1, ind2))
-                    label_np = np.argmax(labels[i].cpu().detach().numpy(),1)
-                    all_acc.append(np.sum(perm == label_np)/n_vertices)
+                if compute_nce:
+                    all_nce.append((g1[i]*g2[i][col_ind,:][:,col_ind]).sum()/2)
             del g1
             del g2
-    if compute_acc:
-        all_acc = np.array(all_acc)
-        return ind_data, all_acc
+    if compute_nce:
+        all_nce = np.array(all_nce)
+        return ind_data, all_nce
     else:
         return ind_data, None
 

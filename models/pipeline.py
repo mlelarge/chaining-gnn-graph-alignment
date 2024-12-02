@@ -44,14 +44,14 @@ class Chaining(Pipeline):
     def __init__(self, path_models: str, num_models: int | None = None):
         super().__init__(path_models, num_models)
 
-    def build_ind(self, data, siamese, verbose=False, compute_acc=False):
+    def build_ind(self, data, siamese, verbose=False, compute_nce=False):
         loader = siamese_loader(data, batch_size=self.batch_size, shuffle=False)
-        ind_data, acc = dg.all_ind(loader, siamese, self.device, compute_acc)
+        ind_data, nce = dg.all_ind(loader, siamese, self.device, compute_nce)
         new = dg.make_data_from_ind_label(data, ind_data)
         if verbose:
-            return new, ind_data, acc
+            return new, ind_data, nce
         else:
-            return new, None, acc
+            return new, None, nce
 
     def train_data(self, data_train, data_val, siamese, L):
         train_loader = siamese_loader(data_train, batch_size=self.batch_size, shuffle=True)
@@ -90,9 +90,9 @@ class Chaining(Pipeline):
                 path_dataset: str, 
                 L :  int | None = None, 
                 N_max : int | None = None,
-                patience : int = 10, #4
+                patience : int = 4, #10 #4
                 verbose : bool = False,
-                eps : float = 0.001):
+                eps : float = 0.01):
         config = load_json(os.path.join(self.path_models, 'config.json'))
         data_test = get_data_test(cfg_data, path_dataset)
         self.batch_size = config['training']['batch_size']
@@ -106,22 +106,22 @@ class Chaining(Pipeline):
         if verbose:
             all_ind_data = []
 
-        current_max_acc = 0
+        current_max_nce = eps
         best_nloop = 0
         stop = patience
         eps = eps
         for (nloop, model_name) in enumerate(self.list_models[:L]):
             siamese = get_siamese_name(os.path.join(self.path_models,model_name), config['model'])
-            new_data_test, current_ind, all_acc = self.build_ind(data_test, siamese, verbose, compute_acc=True)
-            test_acc = all_acc.mean()
-            print(f"Model {model_name} has test accuracy: {test_acc}")
-            delta = test_acc - current_max_acc
+            new_data_test, current_ind, all_nce = self.build_ind(data_test, siamese, verbose, compute_nce=True)
+            test_nce = all_nce.mean()
+            print(f"Model {model_name} has test nce: {test_nce}")
+            delta = test_nce - current_max_nce
             if delta > 0:
-                current_max_acc = test_acc
+                current_max_nce = test_nce
                 best_model = siamese
                 best_data = data_test
                 best_nloop = nloop
-            if delta > eps:
+            if delta/current_max_nce > eps:
                 stop = patience
             else:
                 stop -= 1
@@ -135,16 +135,16 @@ class Chaining(Pipeline):
         
         if N_max and stop >0:
             for i in range(N_max):
-                new_data_test, current_ind, all_acc = self.build_ind(data_test, siamese, verbose, compute_acc=True)
-                test_acc = all_acc.mean()
-                print(f"Model {model_name}-{i} has test accuracy: {test_acc}")
-                delta = test_acc - current_max_acc
+                new_data_test, current_ind, all_nce = self.build_ind(data_test, siamese, verbose, compute_nce=True)
+                test_nce= all_nce.mean()
+                print(f"Model {model_name}-{i} has test nce: {test_nce}")
+                delta = test_nce - current_max_nce
                 if delta > 0:
-                    current_max_acc = test_acc
+                    current_max_nce = test_nce
                     best_model = siamese
                     best_data = data_test
                     best_nloop += 1
-                if delta > eps:
+                if delta/current_max_nce > eps:
                     stop = patience
                 else:
                     stop -= 1
