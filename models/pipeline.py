@@ -6,9 +6,12 @@ import wandb
 from typing import Optional
 
 from models import get_model, get_siamese, get_siamese_name, train_siamese
+from models.pl_model import Siamese_Node
+from loaders.data_generator import GAP_Generator
 from loaders import siamese_loader, get_data, get_data_test
 import loaders.data_generator as dg
 from toolbox.utils import save_json, load_json
+import numpy as np
 
 class Pipeline(ABC):
     def __init__(self, path_models: str, num_models: int | None = None):
@@ -92,10 +95,16 @@ class Chaining(Pipeline):
                 N_max : int | None = None,
                 patience : int = 4, #10 #4
                 verbose : bool = False,
-                eps : float = 0.01):
+                eps : float = 0.01,
+                ind : int | None = None) -> Optional[tuple]:
         config = load_json(os.path.join(self.path_models, 'config.json'))
         data_test = get_data_test(cfg_data, path_dataset)
-        self.batch_size = config['training']['batch_size']
+        if ind is None:
+            self.batch_size = config['training']['batch_size']
+        else:
+            data_test.data = data_test.data[ind]
+            self.batch_size = 1
+                    
         test_loader = siamese_loader(data_test, batch_size=self.batch_size, shuffle=False)
         
         if L:
@@ -156,10 +165,59 @@ class Chaining(Pipeline):
                 test_loader = siamese_loader(data_test, batch_size=self.batch_size, shuffle=False)
 
         if verbose:
-            return all_ind_data, best_model, best_data, best_nloop
+            return np.array(all_ind_data), best_model, best_data, best_nloop
         else:
             return best_model, best_data, best_nloop
 
+    def loop_siamese(self, dataset: list, 
+                siamese: Siamese_Node, 
+                N_max : int | None = None,
+                patience : int = 4, #10 #4
+                verbose : bool = False,
+                eps : float = 0.01,
+                ind : int | None = None) -> Optional[tuple]:
+        
+        data_test = []
+        if ind is None:
+            self.batch_size = 1
+        else:
+            data_test.append(dataset[ind])
+            #data_test.__len__ = 1
+            self.batch_size = 1
+
+
+        print(len(data_test))
+        stop = patience
+        current_max_nce = eps
+        best_nloop = 0
+        all_ind_data = []
+        for i in range(N_max):
+            new_data_test, current_ind, all_nce = self.build_ind(data_test, siamese, verbose, compute_nce=True)
+            test_nce= all_nce.mean()
+            print(f"Model {i} has test nce: {test_nce}")
+            delta = test_nce - current_max_nce
+            if delta > 0:
+                current_max_nce = test_nce
+                best_model = siamese
+                best_data = data_test
+                best_nloop += 1
+            if delta/current_max_nce > eps:
+                stop = patience
+            else:
+                stop -= 1
+                if stop == 0:
+                    break
+            data_test = new_data_test
+            if verbose:
+                all_ind_data.append(current_ind)
+            test_loader = siamese_loader(data_test, batch_size=self.batch_size, shuffle=False)
+        del data_test
+        if verbose:
+            return np.array(all_ind_data), best_model, best_data, best_nloop
+        else:
+            return best_model, best_data, best_nloop
+
+        
 
 class Streaming(Pipeline):
     def __init__(self, path_models: str, num_models: int | None = None):
