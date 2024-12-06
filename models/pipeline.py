@@ -12,6 +12,7 @@ from loaders import siamese_loader, get_data, get_data_test
 import loaders.data_generator as dg
 from toolbox.utils import save_json, load_json
 import numpy as np
+from toolbox.metrics import all_qap_chain
 
 class Pipeline(ABC):
     def __init__(self, path_models: str, num_models: int | None = None):
@@ -93,9 +94,9 @@ class Chaining(Pipeline):
                 path_dataset: str, 
                 L :  int | None = None, 
                 N_max : int | None = None,
-                patience : int = 4, #10 #4
+                patience : int = 10, #4
                 verbose : bool = False,
-                eps : float = 0.01,
+                eps : float = 0.001,
                 ind : int | None = None) -> Optional[tuple]:
         config = load_json(os.path.join(self.path_models, 'config.json'))
         data_test = get_data_test(cfg_data, path_dataset)
@@ -159,6 +160,8 @@ class Chaining(Pipeline):
                     stop -= 1
                     if stop == 0:
                         break
+                if i == N_max-1:
+                    break
                 data_test = new_data_test
                 if verbose:
                     all_ind_data.append(current_ind)
@@ -172,9 +175,9 @@ class Chaining(Pipeline):
     def loop_siamese(self, dataset: list, 
                 siamese: Siamese_Node, 
                 N_max : int | None = None,
-                patience : int = 4, #10 #4
+                patience : int = 10, #10 #4
                 verbose : bool = False,
-                eps : float = 0.01,
+                eps : float = 0.001,
                 ind : int | None = None) -> Optional[tuple]:
         
         data_test = []
@@ -182,11 +185,8 @@ class Chaining(Pipeline):
             self.batch_size = 1
         else:
             data_test.append(dataset[ind])
-            #data_test.__len__ = 1
             self.batch_size = 1
 
-
-        print(len(data_test))
         stop = patience
         current_max_nce = eps
         best_nloop = 0
@@ -207,6 +207,8 @@ class Chaining(Pipeline):
                 stop -= 1
                 if stop == 0:
                     break
+            if i == N_max-1:
+                break
             data_test = new_data_test
             if verbose:
                 all_ind_data.append(current_ind)
@@ -238,7 +240,7 @@ class Streaming(Pipeline):
         self.path_dataset = path_dataset
         self.cfg = cfg
         self.batch_size = self.cfg.training.batch_size
-        self.saving = False
+        self.saving = cfg.saving
         node_embedder = get_model(self.cfg.model)
         config_dict = OmegaConf.to_container(self.cfg, resolve=True)
         save_json(os.path.join(self.path_models, 'config.json'), config_dict)
@@ -255,3 +257,11 @@ class Streaming(Pipeline):
             data_train, data_val = get_data(self.cfg.dataset, self.path_dataset, self.saving)
             self.train_data(data_train, data_val, siamese, L=i)
             
+    def test(self, cfg_data: DictConfig, path_dataset: str, verbose: bool = False):
+        data_test = get_data_test(cfg_data, path_dataset)
+        config = load_json(os.path.join(self.path_models, 'config.json'))
+        #self.batch_size = config['training']['batch_size']
+        test_loader = siamese_loader(data_test, batch_size=1, shuffle=False)
+        model_name = self.list_models[-1]
+        siamese = get_siamese_name(os.path.join(self.path_models,model_name), config['model'])
+        return all_qap_chain(test_loader, siamese, self.device, verbose)

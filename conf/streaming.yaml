@@ -1,4 +1,6 @@
-root_dir: 
+root_dir: /scratch/lelarge
+saving: False
+path_logs:
 
 defaults:
   - _self_

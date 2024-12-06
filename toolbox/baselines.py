@@ -126,13 +126,13 @@ def all_qap_scipy(loader, max_iter = 1000, maxiter_faq=30, seeds = 0, verbose=Fa
             if verbose:
                 all_conv_nit.append(s)
             Pp = perm2mat(col)
-            all_fd.append(fro_norm(P, g1[i], g2[i]))
-            all_fproj.append(fro_norm(Pp, g1[i],g2[i]))
+            all_fd.append(fro_norm(P.T, g1[i], g2[i]))
+            all_fproj.append(fro_norm(Pp.T, g1[i],g2[i]))
             res_qap = quadratic_assignment(g2[i],-g1[i],method='faq',options={"P0": P, "maxiter": maxiter_faq})
             P_qap = perm2mat(res_qap['col_ind'])
-            all_fqap.append(fro_norm(P_qap, g1[i], g2[i]))
+            all_fqap.append(fro_norm(P_qap.T, g1[i], g2[i]))
             P_planted = perm2mat(pl)
-            all_fplanted.append(fro_norm(P_planted, g1[i],g2[i]))
+            all_fplanted.append(fro_norm(P_planted.T, g1[i],g2[i]))
             
             all_planted.append((g2[i]*g1[i][pl,:][:, pl]).sum()/2)
             all_qap.append((g2[i]*g1[i][res_qap['col_ind'],:][:, res_qap['col_ind']]).sum()/2)
