@@ -63,8 +63,8 @@ class Chaining(Pipeline):
         
         train_siamese(train_loader, val_loader, siamese, self.device, self.path_models, self.cfg.training.epochs, self.cfg.training.log_freq, L, self.cfg.training.lr_stop, self.cfg.training.wandb)
         
-        new_train, _ = self.build_ind(data_train, siamese)
-        new_val, _ = self.build_ind(data_val, siamese)
+        new_train, _, _ = self.build_ind(data_train, siamese)
+        new_val, _ , _ = self.build_ind(data_val, siamese)
         if self.cfg.training.wandb:
             wandb.finish()
             #os.system(f"rm -rf {self.path_models}/wandb")
