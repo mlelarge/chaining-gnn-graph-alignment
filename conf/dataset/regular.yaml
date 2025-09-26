@@ -1,0 +1,11 @@
+n_vertices: 500
+generative_model: Regular
+noise_model: EdgeSwap
+edge_density: 0.02
+noise: 0.09
+train:
+  num_examples: 200
+val:
+  num_examples: 20
+test:
+  num_examples: 100
