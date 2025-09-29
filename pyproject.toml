@@ -10,6 +10,7 @@ dependencies = [
     "omegaconf>=2.3.0",
     "pandas>=2.3.2",
     "pyarrow>=21.0.0",
+    "pytorch-lightning>=2.5.5",
     "scipy>=1.16.2",
     "torch>=2.8.0",
     "tqdm>=4.67.1",
