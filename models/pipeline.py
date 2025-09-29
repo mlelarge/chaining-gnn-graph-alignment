@@ -97,11 +97,15 @@ class Chaining(Pipeline):
                 patience : int = 10, #4
                 verbose : bool = False,
                 eps : float = 0.001,
+                batch_size : int | None = None,
                 ind : int | None = None) -> Optional[tuple]:
         config = load_json(os.path.join(self.path_models, 'config.json'))
         data_test = get_data_test(cfg_data, path_dataset)
         if ind is None:
-            self.batch_size = config['training']['batch_size']
+            if batch_size:
+                self.batch_size = batch_size
+            else:
+                self.batch_size = config['training']['batch_size']
         else:
             data_test.data = data_test.data[ind]
             self.batch_size = 1
