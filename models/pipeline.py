@@ -170,6 +170,9 @@ class Chaining(Pipeline):
                 if verbose:
                     all_ind_data.append(current_ind)
                 test_loader = siamese_loader(data_test, batch_size=self.batch_size, shuffle=False)
+            if siamese is not best_model:
+                del siamese
+                torch.cuda.empty_cache()
 
         if verbose:
             return np.array(all_ind_data), best_model, best_data, best_nloop
