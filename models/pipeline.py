@@ -174,7 +174,10 @@ class Chaining(Pipeline):
         if verbose:
             return np.array(all_ind_data), best_model, best_data, best_nloop
         else:
-            return best_model, best_data, best_nloop
+            test_loader = siamese_loader(best_data, batch_size=1, shuffle=False)
+            all_planted, all_qap, all_d, all_acc, all_accd, all_accmax = all_qap_chain(test_loader, best_model, best_model.device)
+            print(f"Best model has (average) nce: {all_qap.mean()}")
+            return best_model, best_data, best_nloop, all_qap
 
     def loop_siamese(self, dataset: list, 
                 siamese: Siamese_Node, 
