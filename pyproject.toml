@@ -15,6 +15,7 @@ dependencies = [
     "scipy>=1.16.2",
     "torch>=2.8.0",
     "tqdm>=4.67.1",
+    "wandb>=0.22.0",
 ]
 
 [dependency-groups]
