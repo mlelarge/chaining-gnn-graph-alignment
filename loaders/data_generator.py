@@ -1,6 +1,7 @@
 import networkx
 import torch
 import numpy as np
+import pandas as pd
 import random
 import itertools
 import os
@@ -9,7 +10,7 @@ from more_itertools import chunked
 import toolbox.utils as utils
 from toolbox.metrics import get_ranking, get_perm
 import copy
-from loaders.load_utils import masking_noseed
+from loaders.load_utils import masking_noseed, recursive_tolist
 
 GENERATOR_FUNCTIONS = {}
 
@@ -112,7 +113,7 @@ def adjacency_matrix_to_tensor_representation(W):
     B[1, indices, indices] = torch.tensor(indices/len(W), dtype=torch.float) 
     return B
 
-def all_perm(loader):
+def all_perm(loader, no_label=False):
     l_data = []
     for g_bs in loader:
         mat_id = torch.eye(g_bs[0][0].shape[-1])
@@ -121,38 +122,64 @@ def all_perm(loader):
         perm = np.random.permutation(g1.shape[-1])
         g1perm = g1[:,:,perm,:][:,:,:,perm]
         label = torch.stack([mat_id for g in g_bs])
-        labelperm = label[:,perm,:]
+        if no_label:
+            labelperm = label
+        else:
+            labelperm = label[:,perm,:]
         for i in range(g1.shape[0]):
             l_data.append((g1perm[i,:,:,:], g2[i,:,:,:], labelperm[i,:,:]))
     return l_data
 
 class Base_Generator(torch.utils.data.Dataset):
-    def __init__(self, name, path_dataset, num_examples, no_seed, saving):
+    def __init__(self, name, path_dataset, num_examples, no_seed, saving, no_label=False):
         self.path_dataset = path_dataset
         self.name = name
         self.num_examples = num_examples
         self.no_seed = no_seed
         self.saving = saving
+        self.no_label = no_label
 
     def load_dataset(self):
         """
         Look for required dataset in files and create it if
         it does not exist
         """
-        filename = self.name + '.pkl'
+        filename = self.name + '.parquet'
         path = os.path.join(self.path_dataset, filename)
         
         if os.path.exists(path):
             print('Reading dataset at {}'.format(path))
-            data = torch.load(path)
-            self.data = list(data)
+            df = pd.read_parquet(path)
+            df['graph_A'] = df['graph_A'].apply(recursive_tolist)
+            df['graph_B'] = df['graph_B'].apply(recursive_tolist)
+            df['permutation'] = df['permutation'].apply(recursive_tolist)
+        
+            self.data = []
+            for _, row in df.iterrows():
+                graph_A = torch.tensor(row['graph_A'], dtype = torch.float32)
+                graph_B = torch.tensor(row['graph_B'], dtype = torch.float32)
+                permutation = torch.tensor(row['permutation'], dtype = torch.float32)
+                self.data.append((graph_A, graph_B, permutation))
         else:
             print('Creating dataset at {}'.format(path))
             l_data = self.create_dataset()
             if self.saving:
                 print('Saving dataset at {}'.format(path))
                 utils.check_dir(self.path_dataset)
-                torch.save(l_data, path)
+                
+                # Convert list of tuples to DataFrame
+                structured_data = []
+                for item_tuple in l_data:
+                    row_dict = {
+                        'graph_A': item_tuple[0].tolist(),
+                        'graph_B': item_tuple[1].tolist(),
+                        'permutation': item_tuple[2].tolist(),
+                    }
+                    structured_data.append(row_dict)
+                
+                df = pd.DataFrame(structured_data)
+                df.to_parquet(path, index=False)
+            
             self.data = l_data
     
     def remove_file(self):
@@ -164,7 +191,7 @@ class Base_Generator(torch.utils.data.Dataset):
         for _ in tqdm.tqdm(range(self.num_examples)):
             example = self.compute_example()
             l_data.append(example)
-        return all_perm(chunked(iter(l_data), bs))
+        return all_perm(chunked(iter(l_data), bs), self.no_label)
 
     def __getitem__(self, i):
         """ Fetch sample at index i """
@@ -182,7 +209,7 @@ class GAP_Generator(Base_Generator):
     """
     Build a numpy dataset of pairs of (Graph, noisy Graph)
     """
-    def __init__(self, name, cfg_data, path_dataset,no_seed=True, saving=True):
+    def __init__(self, name, cfg_data, path_dataset,no_seed=True, saving=True, no_label=False):
         self.generative_model = cfg_data.generative_model
         self.noise_model = cfg_data.noise_model
         self.edge_density = cfg_data.edge_density
@@ -191,7 +218,7 @@ class GAP_Generator(Base_Generator):
         self.n_vertices = cfg_data.n_vertices
         subfolder_name = f"GAP_{self.generative_model}_{self.noise_model}_{num_examples}_{self.n_vertices}_{self.noise}_{self.edge_density}"
         path_dataset = os.path.join(path_dataset, subfolder_name)
-        super().__init__(name, path_dataset, num_examples, no_seed, saving)
+        super().__init__(name, path_dataset, num_examples, no_seed, saving, no_label)
         self.data = []
 
     def compute_example(self):

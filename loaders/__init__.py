@@ -23,6 +23,6 @@ def get_data(cfg_data, path_dataset, saving=True):
 
 def get_data_test(cfg_data, path_dataset):
     generator = dg.GAP_Generator
-    gene_test = generator('test', cfg_data, path_dataset)
+    gene_test = generator('test', cfg_data, path_dataset, no_label=True)
     gene_test.load_dataset()
     return gene_test
