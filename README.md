@@ -86,7 +86,7 @@ If you use this code in your research, please cite:
 ```bibtex
 @article{lelarge2024bootstrap,
   title={Bootstrap Learning for Combinatorial Graph Alignment with Sequential GNNs},
-  author={Lelarge, Marc and Others},
+  author={Lelarge, Marc},
   journal={arXiv preprint arXiv:2510.03086},
   year={2024},
   url={https://arxiv.org/abs/2510.03086}
