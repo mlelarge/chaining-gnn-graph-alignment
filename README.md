@@ -23,7 +23,7 @@ Starting from input graphs $G_A$ and $G_B$, we first (1) extract features and co
 
 ## Performances on Synthetic datasets
 
-Number of common edges (higher is better) for sparse Erdos Reyni random graphs: 
+Number of common edges (higher is better) for sparse Erdős-Rényi random graphs: 
 | noise        | 0   | 0.05 | 0.1 | 0.15 | 0.2 | 0.25 | 0.3 | 0.35 |
 |--------------|-----|------|-----|------|-----|------|-----|------|
 | Proj($D_{\text{cx}}$) | 997 | 950 | 853 | 499 | 195 | 130 | 115 | 112 |
@@ -31,7 +31,7 @@ Number of common edges (higher is better) for sparse Erdos Reyni random graphs:
 | ChFGNN Proj | 997 | 950 | 898 | 845 | 790 | 694 | 503 | 319 |
 | ChFGNN FAQ  | 997 | 950 | 899 | 849 | 800 | 730 | 626 | 534 |
 
-Number of common edges (higher is better) for dense Erdos Reyni random graphs: 
+Number of common edges (higher is better) for dense Erdős-Rényi random graphs: 
 
 | noise        | 0     | 0.05  | 0.1   | 0.15  | 0.2   | 0.25  | 0.3   | 0.35  |
 |--------------|-------|-------|-------|-------|-------|-------|-------|-------|
