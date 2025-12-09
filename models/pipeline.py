@@ -181,7 +181,7 @@ class Chaining(Pipeline):
         # _, data_test = get_data_mm(cfg_data, path_dataset)
         # _, data_test = get_data_ca(cfg_data, path_dataset)
         # _, data_test = get_data_road(cfg_data, path_dataset)
-        # data_test, _ = get_data_mm(cfg_data, path_dataset)
+        # TODO
         if ind is None:
             if batch_size:
                 self.batch_size = batch_size
@@ -200,7 +200,7 @@ class Chaining(Pipeline):
         else:
             L = self.num_models
 
-        if verbose:
+        if verbose or compute_faq:
             all_ind_data = []
             all_nce_data = []
             all_faq_data = []
@@ -247,9 +247,10 @@ class Chaining(Pipeline):
                     break
             data_test = new_data_test
 
-            if verbose:
-                all_ind_data.append(current_ind)
-                all_nce_data.append(all_nce)
+            if verbose or compute_faq:
+                if verbose:
+                    all_ind_data.append(current_ind)
+                    all_nce_data.append(all_nce)
             test_loader = siamese_loader(
                 data_test, batch_size=self.batch_size, shuffle=False
             )
@@ -288,9 +289,10 @@ class Chaining(Pipeline):
                 if i == N_max - 1:
                     break
                 data_test = new_data_test
-                if verbose:
-                    all_ind_data.append(current_ind)
-                    all_nce_data.append(all_nce)
+                if verbose or compute_faq:
+                    if verbose:
+                        all_ind_data.append(current_ind)
+                        all_nce_data.append(all_nce)
                 test_loader = siamese_loader(
                     data_test, batch_size=self.batch_size, shuffle=False
                 )
