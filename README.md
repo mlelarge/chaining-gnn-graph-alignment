@@ -13,7 +13,7 @@ Given two n×n adjacency matrices A and B, representing graphs G_A and G_B, the 
 To evaluate the quality of an alignment, we define the **number of common edges** under a permutation π as  
 ![nce formula](https://latex.codecogs.com/svg.latex?\large\mathbf{nce}(\pi)=\frac12\sum_{i,j}A_{ij}B_{\pi(i)\pi(j)})
 
-The factor of $1/2$ corrects for double-counting edges in undirected graphs.
+The factor of 1/2 corrects for double-counting edges in undirected graphs.
 
 ## Chained FGNNs
 
