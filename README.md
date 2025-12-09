@@ -6,18 +6,18 @@ This repository contains the code for the paper [Bootstrap Learning for Combinat
 
 ![](assets/gap.gif)
 
-Given two \(n \times n\) adjacency matrices $A$ and $B$, representing graphs $G_A$ and $G_B$, the **graph alignment problem** aims to find the permutation $\pi$ that best matches their structures by aligning corresponding edges. Formally, the objective is  
+Given two n×n adjacency matrices A and B, representing graphs G_A and G_B, the **graph alignment problem** aims to find the permutation π that best matches their structures by aligning corresponding edges. Formally, the objective is  
 ![alignment objective](https://latex.codecogs.com/svg.latex?\large\max_{\pi\in\mathcal{S}_n}\sum_{i,j}A_{ij}B_{\pi(i)\pi(j)})
 
 
-To evaluate the quality of an alignment, we define the **number of common edges** under a permutation $\pi$ as  
+To evaluate the quality of an alignment, we define the **number of common edges** under a permutation π as  
 ![nce formula](https://latex.codecogs.com/svg.latex?\large\mathbf{nce}(\pi)=\frac12\sum_{i,j}A_{ij}B_{\pi(i)\pi(j)})
 
 The factor of $1/2$ corrects for double-counting edges in undirected graphs.
 
 ## Chained FGNNs
 
-Starting from input graphs $G_A$ and $G_B$, we first (1) extract features and compute similarities, then iteratively (2) rank nodes by alignment quality, and (3) use rankings to enhance features and similarities.
+Starting from input graphs G_A and G_B, we first (1) extract features and compute similarities, then iteratively (2) rank nodes by alignment quality, and (3) use rankings to enhance features and similarities.
 
 ![](assets/chaining.png)
 
@@ -26,8 +26,8 @@ Starting from input graphs $G_A$ and $G_B$, we first (1) extract features and co
 Number of common edges (higher is better) for sparse Erdős-Rényi random graphs: 
 | noise        | 0   | 0.05 | 0.1 | 0.15 | 0.2 | 0.25 | 0.3 | 0.35 |
 |--------------|-----|------|-----|------|-----|------|-----|------|
-| Proj($D_{\text{cx}}$) | 997 | 950 | 853 | 499 | 195 | 130 | 115 | 112 |
-| FAQ($D_{\text{cx}}$)  | 997 | 950 | 898 | 847 | 723 | 504 | 487 | 485 |
+| Proj(D_cx) | 997 | 950 | 853 | 499 | 195 | 130 | 115 | 112 |
+| FAQ(D_cx)  | 997 | 950 | 898 | 847 | 723 | 504 | 487 | 485 |
 | ChFGNN Proj | 997 | 950 | 898 | 845 | 790 | 694 | 503 | 319 |
 | ChFGNN FAQ  | 997 | 950 | 899 | 849 | 800 | 730 | 626 | 534 |
 
@@ -35,8 +35,8 @@ Number of common edges (higher is better) for dense Erdős-Rényi random graphs:
 
 | noise        | 0     | 0.05  | 0.1   | 0.15  | 0.2   | 0.25  | 0.3   | 0.35  |
 |--------------|-------|-------|-------|-------|-------|-------|-------|-------|
-| Proj($D_{\text{cx}}$) | 19964 | 18987 | 17966 | 8700  | 3888  | 3646  | 3633  | 3624  |
-| FAQ($D_{\text{cx}}$)  | 19964 | 18987 | 17968 | 16990 | 15972 | 7922  | 6272  | 6276  |
+| Proj(D_cx) | 19964 | 18987 | 17966 | 8700  | 3888  | 3646  | 3633  | 3624  |
+| FAQ(D_cx)  | 19964 | 18987 | 17968 | 16990 | 15972 | 7922  | 6272  | 6276  |
 | ChFGNN Proj | 19964 | 18969 | 16241 | 13028 | 9561  | 6166  | 3615  | 3591  |
 | ChFGNN FAQ  | 19964 | 18987 | 17968 | 16990 | 15779 | 11227 | 6258  | 6255  |
 
@@ -44,8 +44,8 @@ Number of common edges (higher is better) for regular random graphs:
 
 | noise        | 0    | 0.05 | 0.1  | 0.15 | 0.2  |
 |--------------|------|------|------|------|------|
-| Proj($D_{\text{cx}}$) | 51   | 51   | 50   | 49   | 50   |
-| FAQ($D_{\text{cx}}$)  | 385  | 425  | 456  | 369  | 496  |
+| Proj(D_cx) | 51   | 51   | 50   | 49   | 50   |
+| FAQ(D_cx)  | 385  | 425  | 456  | 369  | 496  |
 | ChFGNN Proj | 2500 | 1343 | 563  | 192  | 114  |
 | ChFGNN FAQ  | 2500 | 2059 | 1438 | 850  | 837  |
 
