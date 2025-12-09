@@ -7,14 +7,12 @@ This repository contains the code for the paper [Bootstrap Learning for Combinat
 ![](assets/gap.gif)
 
 Given two $n\times n$ adjacency matrices $A$ and $B$, representing graphs $G_A$ and $G_B$, the **graph alignment problem** aims to find the permutation $\pi$ that best matches their structures by aligning corresponding edges. Formally, the objective is  
-$$
-\max_{\pi \in \mathcal{S}_n}\sum_{i,j}A_{ij} B_{\pi(i)\pi(j)} .
-$$
+![alignment objective](https://latex.codecogs.com/svg.latex?\large\max_{\pi\in\mathcal{S}_n}\sum_{i,j}A_{ij}B_{\pi(i)\pi(j)})
+
 
 To evaluate the quality of an alignment, we define the **number of common edges** under a permutation $\pi$ as  
-$$
-\mathbf{nce}(\pi) = \frac{1}{2} \sum_{i,j} A_{ij}\, B_{\pi(i)\pi(j)} .
-$$
+![nce formula](https://latex.codecogs.com/svg.latex?\large\mathbf{nce}(\pi)=\frac12\sum_{i,j}A_{ij}B_{\pi(i)\pi(j)})
+
 The factor of $1/2$ corrects for double-counting edges in undirected graphs.
 
 ## Chained FGNNs
@@ -25,7 +23,7 @@ Starting from input graphs $G_A$ and $G_B$, we first (1) extract features and co
 
 ## Performances on Synthetic datasets
 
-Number of common edges ($\mathbf{nce}$ higher is better) for sparse Erdos Reyni random graphs: 
+Number of common edges (higher is better) for sparse Erdos Reyni random graphs: 
 | noise        | 0   | 0.05 | 0.1 | 0.15 | 0.2 | 0.25 | 0.3 | 0.35 |
 |--------------|-----|------|-----|------|-----|------|-----|------|
 | Proj($D_{\text{cx}}$) | 997 | 950 | 853 | 499 | 195 | 130 | 115 | 112 |
@@ -33,7 +31,7 @@ Number of common edges ($\mathbf{nce}$ higher is better) for sparse Erdos Reyni 
 | ChFGNN Proj | 997 | 950 | 898 | 845 | 790 | 694 | 503 | 319 |
 | ChFGNN FAQ  | 997 | 950 | 899 | 849 | 800 | 730 | 626 | 534 |
 
-Number of common edges ($\mathbf{nce}$ higher is better) for dense Erdos Reyni random graphs: 
+Number of common edges (higher is better) for dense Erdos Reyni random graphs: 
 
 | noise        | 0     | 0.05  | 0.1   | 0.15  | 0.2   | 0.25  | 0.3   | 0.35  |
 |--------------|-------|-------|-------|-------|-------|-------|-------|-------|
@@ -42,7 +40,7 @@ Number of common edges ($\mathbf{nce}$ higher is better) for dense Erdos Reyni r
 | ChFGNN Proj | 19964 | 18969 | 16241 | 13028 | 9561  | 6166  | 3615  | 3591  |
 | ChFGNN FAQ  | 19964 | 18987 | 17968 | 16990 | 15779 | 11227 | 6258  | 6255  |
 
-Number of common edges ($\mathbf{nce}$ higher is better) for regular random graphs:
+Number of common edges (higher is better) for regular random graphs:
 
 | noise        | 0    | 0.05 | 0.1  | 0.15 | 0.2  |
 |--------------|------|------|------|------|------|
