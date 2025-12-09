@@ -2,16 +2,18 @@ import pytorch_lightning as pl
 import torch
 import torch.nn as nn
 from toolbox.metrics import accuracy_max
+from models.loss import combined_loss_with_sinkhorn
 
 
-class Siamese_Node(pl.LightningModule):
+class Siamese_Node_NL(pl.LightningModule):
     def __init__(self, node_emb):
         """ """
         super().__init__()
 
         self.node_embedder = node_emb
 
-        self.loss = nn.CrossEntropyLoss(reduction="mean")
+        # self.loss = nn.CrossEntropyLoss(reduction='mean')
+        self.loss = combined_loss_with_sinkhorn
         self.metric = accuracy_max
 
     def set_training_mode(
@@ -37,26 +39,20 @@ class Siamese_Node(pl.LightningModule):
 
     def training_step(self, batch, batch_idx):
         raw_scores = self(batch[0], batch[1])
-        loss = self.loss(raw_scores, batch[2])
+        # loss = self.loss(raw_scores, batch[2])
+        loss, matching_loss, bisto_loss, M = self.loss(
+            raw_scores,
+            batch[0]["input"][:, 0, :, :],
+            batch[1]["input"][:, 0, :, :],
+            return_M=True,
+        )
         self.log("train_loss", loss)
-        (acc, n) = self.metric(raw_scores, batch[2])
+        self.log("train_matching_loss", matching_loss)
+        self.log("train_bisto_loss", bisto_loss)
+        # (acc,n) = self.metric(raw_scores, batch[2])
+        (acc, n) = self.metric(M, batch[2])
         self.log("train_acc", acc / n)
         return loss
-
-    def validation_step(self, batch, batch_idx):
-        raw_scores = self(batch[0], batch[1])
-        loss = self.loss(raw_scores, batch[2])
-        self.log("val_loss", loss)
-        (acc, n) = self.metric(raw_scores, batch[2])
-        self.log("val_acc", acc / n)
-
-    def test_step(self, batch, batch_idx):
-        raw_scores = self(batch[0], batch[1])
-        loss = self.loss(raw_scores, batch[2])
-        self.log("test_loss", loss)
-        (acc, n) = self.metric(raw_scores, batch[2])
-        self.log("test_acc", acc / n)
-        return acc / n
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), lr=self.lr, amsgrad=False)
@@ -69,7 +65,7 @@ class Siamese_Node(pl.LightningModule):
                     patience=self.scheduler_step,
                     min_lr=self.lr_stop,
                 ),
-                "monitor": "val_loss",
+                "monitor": "train_loss",
                 "frequency": 1,
                 # If "monitor" references validation metrics, then "frequency" should be set to a
                 # multiple of "trainer.check_val_every_n_epoch".

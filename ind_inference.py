@@ -19,7 +19,7 @@ def main(cfg: DictConfig):
     path_models = os.path.join(PB_DIR, cfg.path_models)
     path_logs = os.path.join(PB_DIR, cfg.path_logs)
     check_dir(path_logs)
-    name_file = os.path.join(path_logs, f"ind_results_{cfg.dataset.noise}.npy")
+    name_file = os.path.join(path_logs, f"ind_results_{cfg.L}_{cfg.dataset.noise}.npy")
     chain = Chaining(path_models)
     
     #list_noises = [0, 0.05, 0.1, 0.15, 0.2, 0.25 , 0.3, 0.35]

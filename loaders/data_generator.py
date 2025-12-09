@@ -14,30 +14,36 @@ from loaders.load_utils import masking_noseed, recursive_tolist
 
 GENERATOR_FUNCTIONS = {}
 
+
 def generates(name):
-    """ Register a generator function for a graph distribution """
+    """Register a generator function for a graph distribution"""
+
     def decorator(func):
         GENERATOR_FUNCTIONS[name] = func
         return func
+
     return decorator
+
 
 @generates("ErdosRenyi")
 def generate_erdos_renyi_netx(p, N):
-    """ Generate random Erdos Renyi graph """
+    """Generate random Erdos Renyi graph"""
     g = networkx.erdos_renyi_graph(N, p)
     W = networkx.adjacency_matrix(g).todense()
     return g, torch.as_tensor(W, dtype=torch.float), p
 
+
 @generates("Bernoulli")
 def generate_bernoulli_uniform(a, N):
     # attention a is not the edge density!
-    edge_prob = np.random.uniform(a, 1 - a, size = (N,N))
-    edge_u = np.random.rand(N,N)
-    return None, torch.as_tensor(edge_u<edge_prob, dtype=torch.float), edge_prob
+    edge_prob = np.random.uniform(a, 1 - a, size=(N, N))
+    edge_u = np.random.rand(N, N)
+    return None, torch.as_tensor(edge_u < edge_prob, dtype=torch.float), edge_prob
+
 
 @generates("Regular")
 def generate_regular_graph_netx(p, N):
-    """ Generate random regular graph """
+    """Generate random regular graph"""
     d = p * N
     d = int(d)
     # Make sure N * d is even
@@ -47,33 +53,40 @@ def generate_regular_graph_netx(p, N):
     W = networkx.adjacency_matrix(g).todense()
     return g, torch.as_tensor(W, dtype=torch.float), p
 
+
 NOISE_FUNCTIONS = {}
 
+
 def noise(name):
-    """ Register a noise function """
+    """Register a noise function"""
+
     def decorator(func):
         NOISE_FUNCTIONS[name] = func
         return func
+
     return decorator
+
 
 @noise("ErdosRenyi")
 def noise_erdos_renyi(g, W, noise, edge_density):
     n_vertices = len(W)
     pe1 = noise
-    pe2 = (edge_density*noise)/(1-edge_density)
-    _,noise1,_ = generate_erdos_renyi_netx(pe1, n_vertices)
-    _,noise2,_ = generate_erdos_renyi_netx(pe2, n_vertices)
-    W_noise = W*(1-noise1) + (1-W)*noise2
+    pe2 = (edge_density * noise) / (1 - edge_density)
+    _, noise1, _ = generate_erdos_renyi_netx(pe1, n_vertices)
+    _, noise2, _ = generate_erdos_renyi_netx(pe2, n_vertices)
+    W_noise = W * (1 - noise1) + (1 - W) * noise2
     return W_noise
+
 
 @noise("Bernoulli")
 def noise_bernoulli(g, A, noise, edge_density):
     # Create an empty n x n adjacency matrix filled with zeros
     r = 1 - noise
-    edge_prob = (1-r)*edge_density+r*A.numpy()
+    edge_prob = (1 - r) * edge_density + r * A.numpy()
     N = A.shape[0]
-    edge_u = np.random.rand(N,N)
-    return torch.as_tensor(edge_u<edge_prob, dtype=torch.float)
+    edge_u = np.random.rand(N, N)
+    return torch.as_tensor(edge_u < edge_prob, dtype=torch.float)
+
 
 def is_swappable(g, u, v, s, t):
     """
@@ -86,130 +99,138 @@ def is_swappable(g, u, v, s, t):
     no_parallel_edge = not (g.has_edge(u, t) or g.has_edge(s, v))
     return actual_edges and no_self_loop and no_parallel_edge
 
+
 def do_swap(g, u, v, s, t):
     g.remove_edge(u, v)
     g.remove_edge(s, t)
     g.add_edge(u, t)
     g.add_edge(s, v)
 
+
 @noise("EdgeSwap")
-def noise_edge_swap(g, W, noise, edge_density): #Permet de garder la regularite
+def noise_edge_swap(g, W, noise, edge_density):  # Permet de garder la regularite
     g_noise = g.copy()
     edges_iter = list(itertools.chain(iter(g.edges), ((v, u) for (u, v) in g.edges)))
-    for u,v in edges_iter:
-        if random.random() < noise:             
+    for u, v in edges_iter:
+        if random.random() < noise:
             for s, t in edges_iter:
                 if random.random() < noise and is_swappable(g_noise, u, v, s, t):
                     do_swap(g_noise, u, v, s, t)
     W_noise = networkx.adjacency_matrix(g_noise).todense()
     return torch.as_tensor(W_noise, dtype=torch.float)
 
+
 def adjacency_matrix_to_tensor_representation(W):
-    """ Create a tensor B[0,:,:] = W and B[1,i,i] = i/n"""
+    """Create a tensor B[0,:,:] = W and B[1,i,i] = i/n"""
     degrees = W.sum(1)
-    B = torch.zeros((2,len(W), len(W)))
+    B = torch.zeros((2, len(W), len(W)))
     B[0, :, :] = W
     indices = np.arange(len(W))
-    B[1, indices, indices] = torch.tensor(indices/len(W), dtype=torch.float) 
+    B[1, indices, indices] = torch.tensor(indices / len(W), dtype=torch.float)
     return B
 
-def all_perm(loader, no_label=False):
+
+def all_perm(loader, label=True):
     l_data = []
     for g_bs in loader:
         mat_id = torch.eye(g_bs[0][0].shape[-1])
         g1 = torch.stack([g[0] for g in g_bs])
         g2 = torch.stack([g[1] for g in g_bs])
         perm = np.random.permutation(g1.shape[-1])
-        g1perm = g1[:,:,perm,:][:,:,:,perm]
-        label = torch.stack([mat_id for g in g_bs])
-        if no_label:
-            labelperm = label
+        g1perm = g1[:, :, perm, :][:, :, :, perm]
+        label_mat = torch.stack([mat_id for g in g_bs])
+        if label:
+            labelperm = label_mat[:, perm, :]
         else:
-            labelperm = label[:,perm,:]
+            labelperm = label_mat
         for i in range(g1.shape[0]):
-            l_data.append((g1perm[i,:,:,:], g2[i,:,:,:], labelperm[i,:,:]))
+            l_data.append((g1perm[i, :, :, :], g2[i, :, :, :], labelperm[i, :, :]))
     return l_data
 
+
 class Base_Generator(torch.utils.data.Dataset):
-    def __init__(self, name, path_dataset, num_examples, no_seed, saving, no_label=False):
+    def __init__(self, name, path_dataset, num_examples, no_seed, saving, label=False):
         self.path_dataset = path_dataset
         self.name = name
         self.num_examples = num_examples
         self.no_seed = no_seed
         self.saving = saving
-        self.no_label = no_label
+        self.label = label
 
     def load_dataset(self):
         """
         Look for required dataset in files and create it if
         it does not exist
         """
-        filename = self.name + '.parquet'
+        filename = self.name + ".parquet"
         path = os.path.join(self.path_dataset, filename)
-        
+
         if os.path.exists(path):
-            print('Reading dataset at {}'.format(path))
+            print("Reading dataset at {}".format(path))
             df = pd.read_parquet(path)
-            df['graph_A'] = df['graph_A'].apply(recursive_tolist)
-            df['graph_B'] = df['graph_B'].apply(recursive_tolist)
-            df['permutation'] = df['permutation'].apply(recursive_tolist)
-        
+            df["graph_A"] = df["graph_A"].apply(recursive_tolist)
+            df["graph_B"] = df["graph_B"].apply(recursive_tolist)
+            df["permutation"] = df["permutation"].apply(recursive_tolist)
+
             self.data = []
             for _, row in df.iterrows():
-                graph_A = torch.tensor(row['graph_A'], dtype = torch.float32)
-                graph_B = torch.tensor(row['graph_B'], dtype = torch.float32)
-                permutation = torch.tensor(row['permutation'], dtype = torch.float32)
+                graph_A = torch.tensor(row["graph_A"], dtype=torch.float32)
+                graph_B = torch.tensor(row["graph_B"], dtype=torch.float32)
+                permutation = torch.tensor(row["permutation"], dtype=torch.float32)
                 self.data.append((graph_A, graph_B, permutation))
         else:
-            print('Creating dataset at {}'.format(path))
+            print("Creating dataset at {}".format(path))
             l_data = self.create_dataset()
             if self.saving:
-                print('Saving dataset at {}'.format(path))
+                print("Saving dataset at {}".format(path))
                 utils.check_dir(self.path_dataset)
-                
+
                 # Convert list of tuples to DataFrame
                 structured_data = []
                 for item_tuple in l_data:
                     row_dict = {
-                        'graph_A': item_tuple[0].tolist(),
-                        'graph_B': item_tuple[1].tolist(),
-                        'permutation': item_tuple[2].tolist(),
+                        "graph_A": item_tuple[0].tolist(),
+                        "graph_B": item_tuple[1].tolist(),
+                        "permutation": item_tuple[2].tolist(),
                     }
                     structured_data.append(row_dict)
-                
+
                 df = pd.DataFrame(structured_data)
                 df.to_parquet(path, index=False)
-            
+
             self.data = l_data
-    
+
     def remove_file(self):
-        os.remove(os.path.join(self.path_dataset, self.name + '.pkl'))
-    
-    def create_dataset(self, bs = 5):
+        os.remove(os.path.join(self.path_dataset, self.name + ".pkl"))
+
+    def create_dataset(self, bs=5):
         # same permutation for each batch of size bs
         l_data = []
         for _ in tqdm.tqdm(range(self.num_examples)):
             example = self.compute_example()
             l_data.append(example)
-        return all_perm(chunked(iter(l_data), bs), self.no_label)
+        return all_perm(chunked(iter(l_data), bs), self.label)
 
     def __getitem__(self, i):
-        """ Fetch sample at index i """
+        """Fetch sample at index i"""
         if self.no_seed:
             masking_noseed(self.data[i][0])
-            masking_noseed(self.data[i][1] )   
+            masking_noseed(self.data[i][1])
         return self.data[i]
 
     def __len__(self):
-        """ Get dataset length """
+        """Get dataset length"""
         return len(self.data)
-    
+
 
 class GAP_Generator(Base_Generator):
     """
     Build a numpy dataset of pairs of (Graph, noisy Graph)
     """
-    def __init__(self, name, cfg_data, path_dataset,no_seed=True, saving=True, no_label=False):
+
+    def __init__(
+        self, name, cfg_data, path_dataset, no_seed=True, saving=True, label=True
+    ):
         self.generative_model = cfg_data.generative_model
         self.noise_model = cfg_data.noise_model
         self.edge_density = cfg_data.edge_density
@@ -218,7 +239,7 @@ class GAP_Generator(Base_Generator):
         self.n_vertices = cfg_data.n_vertices
         subfolder_name = f"GAP_{self.generative_model}_{self.noise_model}_{num_examples}_{self.n_vertices}_{self.noise}_{self.edge_density}"
         path_dataset = os.path.join(path_dataset, subfolder_name)
-        super().__init__(name, path_dataset, num_examples, no_seed, saving, no_label)
+        super().__init__(name, path_dataset, num_examples, no_seed, saving, label)
         self.data = []
 
     def compute_example(self):
@@ -226,63 +247,98 @@ class GAP_Generator(Base_Generator):
         Compute pairs (Adjacency, noisy Adjacency)
         """
         try:
-            g, W, new_density = GENERATOR_FUNCTIONS[self.generative_model](self.edge_density, self.n_vertices)
+            g, W, new_density = GENERATOR_FUNCTIONS[self.generative_model](
+                self.edge_density, self.n_vertices
+            )
         except KeyError:
-            raise ValueError('Generative model {} not supported'
-                             .format(self.generative_model))
+            raise ValueError(
+                "Generative model {} not supported".format(self.generative_model)
+            )
         try:
             W_noise = NOISE_FUNCTIONS[self.noise_model](g, W, self.noise, new_density)
         except KeyError:
-            raise ValueError('Noise model {} not supported'
-                             .format(self.noise_model))
+            raise ValueError("Noise model {} not supported".format(self.noise_model))
         B = adjacency_matrix_to_tensor_representation(W)
         B_noise = adjacency_matrix_to_tensor_representation(W_noise)
         return (B, B_noise)
 
-def all_ind(loader, model, device, compute_nce = False, random_order=False):
+
+def all_ind(
+    loader,
+    model,
+    device,
+    compute_nce=False,
+    random_order=False,
+    use_faq=False,
+    compute_faq=False,
+    verbose=False,
+    size_seed=0,
+):
     ind_data = []
     model = model.to(device)
     all_nce = []
+    all_faq = []
+    all_acc = []
     with torch.no_grad():
-        for (data1, data2, _) in loader:
-            data1['input'] = data1['input'].to(device)
-            data2['input'] = data2['input'].to(device)
-            n_vertices = data1['input'].shape[-1]
+        for data1, data2, target in loader:
+            data1["input"] = data1["input"].to(device)
+            data2["input"] = data2["input"].to(device)
+            n_vertices = data1["input"].shape[-1]
             rawscores = model(data1, data2)
             rawscores = rawscores.to(torch.float32).cpu().detach()
-            weights = torch.log_softmax(rawscores,-1)
-            g1 = copy.deepcopy(data1['input'][:,0,:,:].cpu().detach().numpy())
-            g2 = copy.deepcopy(data2['input'][:,0,:,:].cpu().detach().numpy())
+            planted = target.cpu().detach().numpy()
+            weights = torch.log_softmax(rawscores, -1)
+            g1 = copy.deepcopy(data1["input"][:, 0, :, :].cpu().detach().numpy())
+            g2 = copy.deepcopy(data2["input"][:, 0, :, :].cpu().detach().numpy())
             for i, weight in enumerate(weights):
-                ind1, col_ind = get_ranking(weight.numpy(), g1[i], g2[i])
+                ind1, col_ind = get_ranking(weight.numpy(), g1[i], g2[i], use_faq)
+                pl = np.argmax(planted[i], 1)
                 if random_order:
                     ind1 = np.random.permutation(len(ind1))
+                if size_seed > 0:
+                    col_ind = np.concatenate((pl[:size_seed], col_ind[size_seed:]))
                 ind2 = col_ind[ind1]
-                ind_data.append((ind1,ind2))
+                ind_data.append((ind1, ind2))
                 if compute_nce:
-                    all_nce.append((g1[i]*g2[i][col_ind,:][:,col_ind]).sum()/2)
+                    all_nce.append((g1[i] * g2[i][col_ind, :][:, col_ind]).sum() / 2)
+                if compute_faq and not use_faq:  # only if use_faq is False
+                    _, col_ind_faq = get_ranking(weight.numpy(), g1[i], g2[i], True)
+                    nce_faq = (g1[i] * g2[i][col_ind_faq, :][:, col_ind_faq]).sum() / 2
+                    nce_lap = (g1[i] * g2[i][col_ind, :][:, col_ind]).sum() / 2
+                    all_faq.append(nce_faq)
+                    acc = np.sum(pl == col_ind_faq) / n_vertices
+                    all_acc.append(acc)
+                    # print(f"NCE FAQ : {nce_faq}, NCE LAP : {nce_lap}, diff : {nce_faq-nce_lap}")
             del g1
             del g2
+        if verbose:
+            print(
+                f"NCE FAQ : {np.mean(all_faq)}, NCE LAP : {np.mean(all_nce)}, acc : {np.mean(all_acc)}"
+            )
     if compute_nce:
         all_nce = np.array(all_nce)
-        return ind_data, all_nce
+        return ind_data, all_nce, np.array(all_faq) if compute_faq else None
     else:
         return ind_data, None
 
 
-def adjacency_matrix_to_tensor_representation_ind(W , ind=None):
-    """ Create a tensor B = W except on the second diag B[1,j,j] = i where j = ind[i]"""
+def adjacency_matrix_to_tensor_representation_ind(W, ind=None):
+    """Create a tensor B = W except on the second diag B[1,j,j] = i where j = ind[i]"""
     n = W.shape[-1]
     B = torch.zeros((2, n, n))
     B[:] = W[:]
-    B[1,range(n),range(n)] = torch.zeros(n)
+    B[1, range(n), range(n)] = torch.zeros(n)
     if ind is not None:
-        for (i, j) in enumerate(ind):
-            B[1, j, j] = torch.tensor((i)/n, dtype=torch.float) 
+        for i, j in enumerate(ind):
+            B[1, j, j] = torch.tensor((i) / n, dtype=torch.float)
     return B
 
+
 def make_data_from_ind(data, ind):
-    return list([adjacency_matrix_to_tensor_representation_ind(d,i) for d, i in zip(data,ind)])
+    return list(
+        [adjacency_matrix_to_tensor_representation_ind(d, i) for d, i in zip(data, ind)]
+    )
+
 
 def make_data_from_ind_label(data, ind_pair):
     d1 = [d[0] for d in data]
@@ -290,5 +346,5 @@ def make_data_from_ind_label(data, ind_pair):
     label = [d[2] for d in data]
     i1 = [i[0] for i in ind_pair]
     i2 = [i[1] for i in ind_pair]
-    newd1, newd2 = make_data_from_ind(d1,i1), make_data_from_ind(d2,i2)
-    return list(zip(newd1,newd2,label))
+    newd1, newd2 = make_data_from_ind(d1, i1), make_data_from_ind(d2, i2)
+    return list(zip(newd1, newd2, label))
