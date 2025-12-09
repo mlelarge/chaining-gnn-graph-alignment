@@ -4,19 +4,11 @@ import torch
 import os
 import wandb
 from typing import Optional
-import time
 
-from models import get_model, get_siamese, get_siamese_name, train_siamese
+from models import get_model, get_siamese, get_siamese_nl, train_siamese_nl
 from models.pl_model import Siamese_Node
 from loaders.data_generator import GAP_Generator
-from loaders import (
-    siamese_loader,
-    get_data,
-    get_data_test,
-    get_data_mm,
-    get_data_ca,
-    get_data_road,
-)
+from loaders import siamese_loader, get_data_nl
 import loaders.data_generator as dg
 from toolbox.utils import save_json, load_json
 import numpy as np
@@ -60,7 +52,7 @@ class Pipeline(ABC):
     #    pass
 
 
-class Chaining(Pipeline):
+class Chaining_NL(Pipeline):
     def __init__(self, path_models: str, num_models: int | None = None):
         super().__init__(path_models, num_models)
 
@@ -72,7 +64,6 @@ class Chaining(Pipeline):
         compute_nce=False,
         use_faq=False,
         compute_faq=False,
-        size_seed: int = 20,
     ):
         loader = siamese_loader(data, batch_size=self.batch_size, shuffle=False)
         if compute_faq:
@@ -82,31 +73,22 @@ class Chaining(Pipeline):
                 self.device,
                 compute_nce=compute_nce,
                 compute_faq=compute_faq,
-                verbose=verbose,
-                size_seed=size_seed,
             )
         else:
-            ind_data, nce, _ = dg.all_ind(
-                loader,
-                siamese,
-                self.device,
-                compute_nce,
-                use_faq=use_faq,
-                verbose=verbose,
-                size_seed=size_seed,
+            ind_data, nce = dg.all_ind(
+                loader, siamese, self.device, compute_nce, use_faq=use_faq
             )
         new = dg.make_data_from_ind_label(data, ind_data)
         return new, ind_data if verbose else None, nce, all_faq if compute_faq else None
 
-    def train_data(self, data_train, data_val, siamese, L):
+    def train_data(self, data_train, siamese, L):
         train_loader = siamese_loader(
             data_train, batch_size=self.batch_size, shuffle=True
         )
-        val_loader = siamese_loader(data_val, batch_size=self.batch_size, shuffle=False)
+        # val_loader = siamese_loader(data_val, batch_size=self.batch_size, shuffle=False)
 
-        train_siamese(
+        train_siamese_nl(
             train_loader,
-            val_loader,
             siamese,
             self.device,
             self.path_models,
@@ -118,11 +100,11 @@ class Chaining(Pipeline):
         )
 
         new_train, _, _, _ = self.build_ind(data_train, siamese)
-        new_val, _, _, _ = self.build_ind(data_val, siamese)
+        # new_val, _ , _, _ = self.build_ind(data_val, siamese)
         if self.cfg.training.wandb:
             wandb.finish()
             # os.system(f"rm -rf {self.path_models}/wandb")
-        return new_train, new_val
+        return new_train
 
     def train(self, cfg: DictConfig, path_dataset: str) -> None:
         self.path_dataset = path_dataset
@@ -133,7 +115,8 @@ class Chaining(Pipeline):
         config_dict = OmegaConf.to_container(self.cfg, resolve=True)
         save_json(os.path.join(self.path_models, "config.json"), config_dict)
 
-        siamese = get_siamese(node_embedder)
+        siamese = get_siamese_nl(node_embedder)
+        # siamese = get_siamese(node_embedder)
         siamese.set_training_mode(
             lr=self.cfg.training.lr,
             scheduler_decay=self.cfg.training.scheduler_decay,
@@ -141,26 +124,19 @@ class Chaining(Pipeline):
             lr_stop=self.cfg.training.lr_stop,
         )
 
-        # data_train, data_val = get_data(
-        #    self.cfg.dataset, self.path_dataset, self.saving
-        # )
-        # data_train, data_val = get_data_mm(
-        #    self.cfg.dataset, self.path_dataset, self.saving
-        # )
-        data_train, data_val = get_data_road(
-            self.cfg.dataset, self.path_dataset, self.saving
-        )
-        new_train, new_val = self.train_data(data_train, data_val, siamese, L=0)
+        data_train = get_data_nl(self.cfg.dataset, self.path_dataset, self.saving)
+        new_train = self.train_data(data_train, siamese, L=0)
 
-        siamese = get_siamese(node_embedder)
+        siamese = get_siamese_nl(node_embedder)
+        # siamese = get_siamese(node_embedder)
         siamese.set_training_mode(
-            lr=self.cfg.training.lr,
+            lr=0.0001,  # self.cfg.training.lr,
             scheduler_decay=self.cfg.training.scheduler_decay,
             scheduler_step=self.cfg.training.scheduler_step,
             lr_stop=self.cfg.training.lr_stop,
         )
         for i in range(1, self.num_models):
-            new_train, new_val = self.train_data(new_train, new_val, siamese, L=i)
+            new_train = self.train_data(new_train, siamese, L=i)
 
     def loop(
         self,
@@ -174,14 +150,9 @@ class Chaining(Pipeline):
         batch_size: int | None = None,
         ind: int | None = None,
         compute_faq: bool = False,
-        timing: bool = False,
     ) -> Optional[tuple]:
         config = load_json(os.path.join(self.path_models, "config.json"))
         data_test = get_data_test(cfg_data, path_dataset)
-        # _, data_test = get_data_mm(cfg_data, path_dataset)
-        # _, data_test = get_data_ca(cfg_data, path_dataset)
-        # _, data_test = get_data_road(cfg_data, path_dataset)
-        # TODO
         if ind is None:
             if batch_size:
                 self.batch_size = batch_size
@@ -200,7 +171,7 @@ class Chaining(Pipeline):
         else:
             L = self.num_models
 
-        if verbose or compute_faq:
+        if verbose:
             all_ind_data = []
             all_nce_data = []
             all_faq_data = []
@@ -209,19 +180,12 @@ class Chaining(Pipeline):
         best_nloop = 0
         stop = patience
         eps = eps
-        if timing:
-            start_time = time.time()
-            all_times = []
         for nloop, model_name in enumerate(self.list_models[:L]):
             siamese = get_siamese_name(
                 os.path.join(self.path_models, model_name), config["model"]
             )
             new_data_test, current_ind, all_nce, all_faq = self.build_ind(
-                data_test,
-                siamese,
-                verbose,
-                compute_nce=True,
-                compute_faq=compute_faq,
+                data_test, siamese, verbose, compute_nce=True, compute_faq=compute_faq
             )
             test_nce = all_nce.mean()
             print(f"Model {model_name} has test nce: {test_nce}")
@@ -229,11 +193,6 @@ class Chaining(Pipeline):
                 print(f"Model {model_name} has test faq: {all_faq.mean()}")
                 all_faq_data.append(all_faq)
             delta = test_nce - current_max_nce
-            if timing:
-                elapsed_time = time.time() - start_time
-                all_times.append(elapsed_time)
-                start_time = time.time()
-                print(f"Time for model {model_name}: {elapsed_time} seconds")
             if delta > 0:
                 current_max_nce = test_nce
                 best_model = siamese
@@ -247,10 +206,9 @@ class Chaining(Pipeline):
                     break
             data_test = new_data_test
 
-            if verbose or compute_faq:
-                if verbose:
-                    all_ind_data.append(current_ind)
-                    all_nce_data.append(all_nce)
+            if verbose:
+                all_ind_data.append(current_ind)
+                all_nce_data.append(all_nce)
             test_loader = siamese_loader(
                 data_test, batch_size=self.batch_size, shuffle=False
             )
@@ -270,11 +228,6 @@ class Chaining(Pipeline):
                     print(f"Model {model_name}-{i} has test faq: {all_faq.mean()}")
                     all_faq_data.append(all_faq)
                 delta = test_nce - current_max_nce
-                if timing:
-                    elapsed_time = time.time() - start_time
-                    all_times.append(elapsed_time)
-                    start_time = time.time()
-                    print(f"Time for model {model_name}-{i}: {elapsed_time} seconds")
                 if delta > 0:
                     current_max_nce = test_nce
                     best_model = siamese
@@ -289,10 +242,9 @@ class Chaining(Pipeline):
                 if i == N_max - 1:
                     break
                 data_test = new_data_test
-                if verbose or compute_faq:
-                    if verbose:
-                        all_ind_data.append(current_ind)
-                        all_nce_data.append(all_nce)
+                if verbose:
+                    all_ind_data.append(current_ind)
+                    all_nce_data.append(all_nce)
                 test_loader = siamese_loader(
                     data_test, batch_size=self.batch_size, shuffle=False
                 )
@@ -302,8 +254,6 @@ class Chaining(Pipeline):
             test_loader, best_model, best_model.device
         )
         print(f"Best model has (average) nce: {all_qap.mean()}")
-        print(f"Best model has acc: {all_acc.mean()}")
-        print(f"Best model has accmax: {all_accmax}")
         if verbose:
             return (
                 np.array(all_ind_data),
@@ -313,7 +263,6 @@ class Chaining(Pipeline):
                 all_qap,
                 np.array(all_nce_data),
                 np.array(all_faq_data) if compute_faq else None,
-                np.array(all_times) if timing else None,
             )
         else:
             return best_model, best_data, best_nloop, all_qap
