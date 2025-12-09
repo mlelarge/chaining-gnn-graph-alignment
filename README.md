@@ -6,7 +6,7 @@ This repository contains the code for the paper [Bootstrap Learning for Combinat
 
 ![](assets/gap.gif)
 
-Given two $n\times n$ adjacency matrices $A$ and $B$, representing graphs $G_A$ and $G_B$, the **graph alignment problem** aims to find the permutation $\pi$ that best matches their structures by aligning corresponding edges. Formally, the objective is  
+Given two \(n \times n\) adjacency matrices $A$ and $B$, representing graphs $G_A$ and $G_B$, the **graph alignment problem** aims to find the permutation $\pi$ that best matches their structures by aligning corresponding edges. Formally, the objective is  
 ![alignment objective](https://latex.codecogs.com/svg.latex?\large\max_{\pi\in\mathcal{S}_n}\sum_{i,j}A_{ij}B_{\pi(i)\pi(j)})
 
 
