@@ -1,3 +1,4 @@
+type: synthetic
 n_vertices: 100
 generative_model: ErdosRenyi
 noise_model: ErdosRenyi

@@ -1,0 +1,12 @@
+type: real
+data_subdir: inf-euroroad
+no_seed: true
+train:
+  name: road_noise1_train
+  num_examples: 6
+val:
+  name: road_noise1_test
+  num_examples: 2
+test:
+  name: road_noise1_test
+  num_examples: 2

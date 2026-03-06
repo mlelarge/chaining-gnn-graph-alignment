@@ -1,0 +1,12 @@
+type: real
+data_subdir: ca-netscience
+no_seed: true
+train:
+  name: ca_nets_noise1_train
+  num_examples: 6
+val:
+  name: ca_nets_noise1_test
+  num_examples: 2
+test:
+  name: ca_nets_noise1_test
+  num_examples: 2

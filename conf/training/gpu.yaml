@@ -1,4 +1,4 @@
-epochs: 100
+epochs: 2
 batch_size:  6
 lr: !!float 1e-4
 scheduler_step: 3

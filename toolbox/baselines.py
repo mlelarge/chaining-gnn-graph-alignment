@@ -2,8 +2,22 @@ import numpy as np
 from scipy.optimize import linear_sum_assignment
 from scipy.optimize import quadratic_assignment
 
+from toolbox.utils import perm2mat
+
 
 def baseline(loader):
+    """Compute baseline QAP metrics over a dataloader.
+
+    For each sample, evaluates the identity mapping, the planted (ground-truth)
+    solution, and an unsupervised FAQ solution.
+
+    Returns:
+        Tuple of (all_b, all_u, all_acc, all_p) as numpy arrays:
+        - all_b: edge overlap under identity mapping
+        - all_u: edge overlap under FAQ solution
+        - all_acc: accuracy of FAQ vs planted
+        - all_p: edge overlap under planted solution
+    """
     all_b = []
     all_u = []
     all_acc = []
@@ -31,27 +45,43 @@ def baseline(loader):
     return np.array(all_b), np.array(all_u), np.array(all_acc), np.array(all_p)
 
 
-# inspired from the matlab code
+# Inspired from the matlab code:
 # https://github.com/jovo/FastApproximateQAP/blob/master/code/SGM/relaxed_normAPPB_FW_seeds.m
 
 
-def perm2mat(p):
-    n = np.max(p.shape)
-    P = np.zeros((n, n))
-    for i in range(n):
-        P[i, p[i]] = 1
-    return P
-
-
 def fro_norm(P, A, B):
+    """Compute squared Frobenius norm ||AP - PB||_F^2."""
     return np.linalg.norm(np.dot(A, P) - np.dot(P, B), ord="fro") ** 2
 
 
 def indef_rel(P, A, B):
+    """Compute indefinite relaxation: -trace(A^T P B^T P).
+
+    .. deprecated::
+        This function is currently unused and may be removed in a future version.
+    """
     return -np.trace(np.transpose(A @ P) @ (P @ B))
 
 
 def relaxed_normAPPB_FW_seeds(A, B, max_iter=1000, seeds=0, verbose=False):
+    """Frank-Wolfe algorithm for the graph matching problem with seeded nodes.
+
+    Minimizes ||AP - PB||_F^2 over doubly-stochastic matrices using the
+    Frank-Wolfe (conditional gradient) method.
+    See: https://github.com/jovo/FastApproximateQAP
+
+    Args:
+        A, B: (n, n) adjacency matrices of the two graphs.
+        max_iter: Maximum number of Frank-Wolfe iterations.
+        seeds: Number of pre-matched (seeded) node correspondences.
+        verbose: If True, return the iteration count.
+
+    Returns:
+        (P, col_ind, s):
+        - P: Relaxed doubly-stochastic solution (transposed).
+        - col_ind: Projected permutation from linear assignment.
+        - s: Iteration count (None if verbose=False).
+    """
     AtA = np.dot(A.T, A)
     BBt = np.dot(B, B.T)
     p = A.shape[0]
@@ -82,8 +112,6 @@ def relaxed_normAPPB_FW_seeds(A, B, max_iter=1000, seeds=0, verbose=False):
         grad[:seeds, :] = 0
         grad[:, :seeds] = 0
 
-        # G = np.round(grad)
-
         row_ind, col_ind = linear_sum_assignment(grad[seeds:, seeds:])
 
         Ps = perm2mat(col_ind)
@@ -91,15 +119,6 @@ def relaxed_normAPPB_FW_seeds(A, B, max_iter=1000, seeds=0, verbose=False):
 
         C = np.dot(A, P - Ps) + np.dot(Ps - P, B)
         D = np.dot(A, Ps) - np.dot(Ps, B)
-
-        # TODO: check this part
-        # aq = np.trace(np.dot(C, C.T))
-        # if aq > 1e-10:
-        #    bq = np.trace(np.dot(C, D.T) + np.dot(D, C.T))
-        #    aopt = np.clip(-bq / (2 * aq), 0, 1)
-        # else:
-        #    aopt = 2 / (s + 2)  # fallback to diminishing step size
-        # Ps4 = aopt * P + (1 - aopt) * Ps
 
         aq = np.trace(np.dot(C, C.T))
         bq = np.trace(np.dot(C, D.T) + np.dot(D, C.T))
@@ -122,6 +141,23 @@ def relaxed_normAPPB_FW_seeds(A, B, max_iter=1000, seeds=0, verbose=False):
 
 
 def all_qap_scipy(loader, max_iter=1000, maxiter_faq=30, seeds=0, verbose=False):
+    """Evaluate graph alignment using Frank-Wolfe + FAQ on a dataloader.
+
+    Computes multiple metrics comparing the Frank-Wolfe relaxation, FAQ
+    refinement, and planted (ground-truth) solutions.
+
+    Args:
+        loader: Dataloader yielding (data1, data2, target) batches.
+        max_iter: Max iterations for Frank-Wolfe.
+        maxiter_faq: Max iterations for scipy FAQ refinement.
+        seeds: Number of seeded correspondences.
+        verbose: If True, also return iteration counts.
+
+    Returns:
+        Without verbose: 9 numpy arrays
+            (planted, qap, d, acc, accd, fd, fproj, fqap, fplanted).
+        With verbose: 11 numpy arrays (above + conv_nit, nit).
+    """
     all_qap = []
     all_d = []
     all_planted = []

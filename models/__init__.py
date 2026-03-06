@@ -9,8 +9,7 @@ from pytorch_lightning.callbacks import (
 from lightning.pytorch.loggers import CSVLogger, WandbLogger
 from models.utils import Network
 from models.block_net import node_embedding_node_pos, block_res_mem
-from models.pl_model import Siamese_Node
-from models.pl_model_nl import Siamese_Node_NL
+from models.pl_model import Siamese_Node, Siamese_Node_NL
 
 get_node_emb = {
     "node_embedding_node_pos": node_embedding_node_pos,
@@ -65,7 +64,6 @@ def get_siamese_name_nl(path, config):
 
 def train_siamese(
     train_loader,
-    val_loader,
     siamese,
     device,
     path_models,
@@ -74,14 +72,34 @@ def train_siamese(
     L,
     lr_stop=1e-7,
     wandb=False,
+    val_loader=None,
 ):
     model_name = f"siamese_{L:02d}"
+    use_labels = not isinstance(siamese, Siamese_Node_NL)
+    if val_loader is not None:
+        if use_labels:
+            monitor_metric = "val_acc"
+            monitor_mode = "max"
+            filename_metrics = "-{epoch}-{val_loss:.2f}-{val_acc:.2f}"
+        else:
+            monitor_metric = "val_loss"
+            monitor_mode = "min"
+            filename_metrics = "-{epoch}-{val_loss:.2f}"
+    else:
+        if use_labels:
+            monitor_metric = "train_acc"
+            monitor_mode = "max"
+            filename_metrics = "-{epoch}-{train_loss:.2f}-{train_acc:.2f}"
+        else:
+            monitor_metric = "train_loss"
+            monitor_mode = "min"
+            filename_metrics = "-{epoch}-{train_loss:.2f}"
     checkpoint_callback = ModelCheckpoint(
         save_top_k=1,
-        mode="max",
-        monitor="val_acc",
+        mode=monitor_mode,
+        monitor=monitor_metric,
         dirpath=path_models,
-        filename=model_name + "-{epoch}-{val_loss:.2f}-{val_acc:.2f}",
+        filename=model_name + filename_metrics,
     )
     lr_monitor = LearningRateMonitor(logging_interval="epoch")
     monitor_key = "lr-Adam"
@@ -108,52 +126,6 @@ def train_siamese(
         callbacks=[checkpoint_callback, lr_monitor, lr_es],
     )
     trainer.fit(siamese, train_loader, val_loader)
-
-
-def train_siamese_nl(
-    train_loader,
-    siamese,
-    device,
-    path_models,
-    max_epochs,
-    log_every_n_steps,
-    L,
-    lr_stop=1e-7,
-    wandb=False,
-):
-    model_name = f"siamese_{L:02d}"
-    checkpoint_callback = ModelCheckpoint(
-        save_top_k=1,
-        mode="max",
-        monitor="train_acc",
-        dirpath=path_models,
-        filename=model_name + "-{epoch}-{train_loss:.2f}-{train_acc:.2f}",
-    )
-    lr_monitor = LearningRateMonitor(logging_interval="epoch")
-    monitor_key = "lr-Adam"
-    lr_es = EarlyStopping(
-        monitor=monitor_key,
-        mode="min",
-        stopping_threshold=lr_stop,
-        patience=100,
-        check_on_train_epoch_end=True,
-    )
-    if wandb:
-        project_name = os.path.basename(path_models.rstrip(os.sep))
-        logger = WandbLogger(
-            project=project_name, name=model_name, save_dir=path_models
-        )
-    else:
-        logger = CSVLogger(path_models, name=model_name)
-    trainer = pl.Trainer(
-        accelerator=device,
-        max_epochs=max_epochs,
-        precision="16-mixed",
-        logger=logger,
-        log_every_n_steps=log_every_n_steps,
-        callbacks=[checkpoint_callback, lr_monitor, lr_es],
-    )
-    trainer.fit(siamese, train_loader)
 
 
 def test_siamese(test_loader, siamese, device, path_logs):
