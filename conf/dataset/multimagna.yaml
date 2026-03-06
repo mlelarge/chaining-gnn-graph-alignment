@@ -1,0 +1,12 @@
+type: real
+data_subdir: MultiMagna
+no_seed: true
+train:
+  name: yeast0_25_noise005
+  num_examples: 6
+val:
+  name: yeast0_25_noise005_test
+  num_examples: 2
+test:
+  name: yeast0_25_noise005_test
+  num_examples: 2

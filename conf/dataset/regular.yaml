@@ -1,3 +1,4 @@
+type: synthetic
 n_vertices: 500
 generative_model: Regular
 noise_model: EdgeSwap

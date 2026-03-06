@@ -2,7 +2,7 @@ root_dir: /scratch/lelarge/
 
 defaults:
   - _self_
-  - dataset: sparse
+  - dataset: tai40a
   - model: fgnn
   - training: gpu
   - pipeline: chain_noseed

@@ -1,0 +1,9 @@
+type: nl
+data_subdir: QAP
+no_seed: true
+train:
+  name: tai40a_noise
+  num_examples: 500
+val:
+  name: tai40a_test
+  num_examples: 1
