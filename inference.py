@@ -37,9 +37,10 @@ def main(cfg: DictConfig):
     ALL_nloop = np.zeros((l, n_ex))
     for i, noise in enumerate(list_noises):
         cfg.dataset.noise = noise
-        best_model, best_data, best_nloop = chain.loop(
+        result = chain.loop(
             cfg.dataset, DATA_PB_DIR, L=cfg.L, N_max=cfg.N_max
         )
+        best_model, best_data, best_nloop = result.best_model, result.best_data, result.best_nloop
         test_loader = siamese_loader(best_data, batch_size=1, shuffle=False)
         all_planted, all_qap, all_d, all_acc, all_accd, all_accmax, all_nit = (
             all_qap_chain(test_loader, best_model, best_model.device, verbose=True)

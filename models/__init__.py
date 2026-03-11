@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 import os
+import warnings
 import pytorch_lightning as pl
 import torch
 from pytorch_lightning.callbacks import (
@@ -10,6 +13,7 @@ from lightning.pytorch.loggers import CSVLogger, WandbLogger
 from models.utils import Network
 from models.block_net import node_embedding_node_pos, block_res_mem
 from models.pl_model import Siamese_Node, Siamese_Node_NL
+from models.config import SiameseMode, OptimizationConfig
 
 get_node_emb = {
     "node_embedding_node_pos": node_embedding_node_pos,
@@ -46,20 +50,77 @@ def get_model(cfg_model, original_features_num=2):
     return Network(node_emb_dic)
 
 
-def get_siamese(model):
-    return Siamese_Node(model)
+def get_siamese(node_emb, opt_cfg: OptimizationConfig | None = None,
+                mode: SiameseMode = SiameseMode.LABELED):
+    """Factory for Siamese models.
+
+    Args:
+        node_emb: Node embedding network (output of get_model).
+        opt_cfg: Optional OptimizationConfig.  When provided the model's
+            ``opt_cfg`` attribute is set so that ``configure_optimizers`` can
+            use it without a separate ``set_training_mode`` call.
+        mode: SiameseMode.LABELED (CrossEntropyLoss) or
+              SiameseMode.UNLABELED (Sinkhorn loss).
+
+    Returns:
+        A Siamese_Node or Siamese_Node_NL instance.
+    """
+    if mode == SiameseMode.UNLABELED:
+        model = Siamese_Node_NL(node_emb)
+    else:
+        model = Siamese_Node(node_emb)
+    if opt_cfg is not None:
+        model.opt_cfg = opt_cfg
+    return model
 
 
-def get_siamese_name(path, config):
-    return Siamese_Node.load_from_checkpoint(path, node_emb=get_model(config))
+def get_siamese_name(path, config, opt_cfg: OptimizationConfig | None = None,
+                     mode: SiameseMode = SiameseMode.LABELED):
+    """Load a Siamese model from a checkpoint.
+
+    Args:
+        path: Path to the ``.ckpt`` checkpoint file.
+        config: Model config dict (passed to get_model).
+        opt_cfg: Optional OptimizationConfig.
+        mode: SiameseMode.LABELED or SiameseMode.UNLABELED.
+
+    Returns:
+        Loaded Siamese_Node or Siamese_Node_NL instance.
+    """
+    node_emb = get_model(config)
+    if mode == SiameseMode.UNLABELED:
+        model = Siamese_Node_NL.load_from_checkpoint(path, node_emb=node_emb)
+    else:
+        model = Siamese_Node.load_from_checkpoint(path, node_emb=node_emb)
+    if opt_cfg is not None:
+        model.opt_cfg = opt_cfg
+    return model
 
 
-def get_siamese_nl(model):
-    return Siamese_Node_NL(model)
+# ---------------------------------------------------------------------------
+# Deprecated single-mode helpers (kept for backward compatibility)
+# ---------------------------------------------------------------------------
+
+def get_siamese_nl(node_emb):
+    """Deprecated: use get_siamese(node_emb, mode=SiameseMode.UNLABELED)."""
+    warnings.warn(
+        "get_siamese_nl is deprecated; use "
+        "get_siamese(node_emb, mode=SiameseMode.UNLABELED) instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    return get_siamese(node_emb, mode=SiameseMode.UNLABELED)
 
 
 def get_siamese_name_nl(path, config):
-    return Siamese_Node_NL.load_from_checkpoint(path, node_emb=get_model(config))
+    """Deprecated: use get_siamese_name(path, config, mode=SiameseMode.UNLABELED)."""
+    warnings.warn(
+        "get_siamese_name_nl is deprecated; use "
+        "get_siamese_name(path, config, mode=SiameseMode.UNLABELED) instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    return get_siamese_name(path, config, mode=SiameseMode.UNLABELED)
 
 
 def train_siamese(

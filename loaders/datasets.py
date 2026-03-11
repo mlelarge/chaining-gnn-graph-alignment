@@ -1,5 +1,6 @@
 """Dataset classes for graph alignment."""
 
+from typing import Optional
 import torch
 import numpy as np
 import pandas as pd
@@ -12,32 +13,58 @@ from loaders.representations import adjacency_matrix_to_tensor_representation
 from loaders.generators import GENERATOR_FUNCTIONS, NOISE_FUNCTIONS
 
 
-def all_perm(loader, label=True):
+def permute(tensor, p):
+    """Apply permutation p to both row and column dimensions of a 3-D tensor."""
+    return tensor[:, p, :][:, :, p]
+
+
+def permute_perm(label, p):
+    """Apply permutation p to the row dimension of a 2-D label matrix."""
+    return label[p, :]
+
+
+def all_perm(
+    data,
+    rng: Optional[np.random.Generator] = None,
+    per_sample: bool = True,
+) -> list:
+    """Apply random permutations to graph pairs.
+
+    Args:
+        data:       Iterable of batches; each batch is a list of
+                    (graph_A, graph_B[, label]) tuples.
+        rng:        NumPy Generator. If None, uses np.random.default_rng().
+        per_sample: If True (default), generate an independent permutation per
+                    sample.  If False, use one shared permutation for the whole
+                    batch (legacy behavior).
+    """
+    rng = rng or np.random.default_rng()
     l_data = []
-    for g_bs in loader:
+    for g_bs in data:
         mat_id = torch.eye(g_bs[0][0].shape[-1])
         g1 = torch.stack([g[0] for g in g_bs])
         g2 = torch.stack([g[1] for g in g_bs])
-        perm = np.random.permutation(g1.shape[-1])
-        g1perm = g1[:, :, perm, :][:, :, :, perm]
         label_mat = torch.stack([mat_id for g in g_bs])
-        if label:
-            labelperm = label_mat[:, perm, :]
-        else:
-            labelperm = label_mat
+        n_vertices = g1.shape[-1]
+        if not per_sample:
+            shared_p = rng.permutation(n_vertices)
         for i in range(g1.shape[0]):
-            l_data.append((g1perm[i, :, :, :], g2[i, :, :, :], labelperm[i, :, :]))
+            p = rng.permutation(n_vertices) if per_sample else shared_p
+            g1perm = g1[i][:, p, :][:, :, p]
+            labelperm = label_mat[i][p, :]
+            l_data.append((g1perm, g2[i, :, :, :], labelperm))
     return l_data
 
 
 class Base_Generator(torch.utils.data.Dataset):
-    def __init__(self, name, path_dataset, num_examples, no_seed=True, saving=False, label=False):
+    def __init__(self, name, path_dataset, num_examples, no_seed=True, saving=False, label=False, seed: Optional[int] = None):
         self.path_dataset = path_dataset
         self.name = name
         self.num_examples = num_examples
         self.no_seed = no_seed
         self.saving = saving
         self.label = label
+        self.rng = np.random.default_rng(seed)
 
     def load_dataset(self):
         """
@@ -102,7 +129,7 @@ class Base_Generator(torch.utils.data.Dataset):
         for _ in tqdm.tqdm(range(self.num_examples)):
             example = self.compute_example()
             l_data.append(example)
-        return all_perm(chunked(iter(l_data), bs), self.label)
+        return all_perm(chunked(iter(l_data), bs), rng=self.rng)
 
     def __getitem__(self, i):
         """Fetch sample at index i"""
@@ -122,7 +149,7 @@ class GAP_Generator(Base_Generator):
     """
 
     def __init__(
-        self, name, cfg_data, path_dataset, no_seed=True, saving=True, label=True
+        self, name, cfg_data, path_dataset, no_seed=True, saving=True, label=True, seed: Optional[int] = None
     ):
         self.generative_model = cfg_data.generative_model
         self.noise_model = cfg_data.noise_model
@@ -132,7 +159,7 @@ class GAP_Generator(Base_Generator):
         self.n_vertices = cfg_data.n_vertices
         subfolder_name = f"GAP_{self.generative_model}_{self.noise_model}_{num_examples}_{self.n_vertices}_{self.noise}_{self.edge_density}"
         path_dataset = os.path.join(path_dataset, subfolder_name)
-        super().__init__(name, path_dataset, num_examples, no_seed, saving, label)
+        super().__init__(name, path_dataset, num_examples, no_seed, saving, label, seed=seed)
         self.data = []
 
     def compute_example(self):
@@ -141,14 +168,14 @@ class GAP_Generator(Base_Generator):
         """
         try:
             g, W, new_density = GENERATOR_FUNCTIONS[self.generative_model](
-                self.edge_density, self.n_vertices
+                self.edge_density, self.n_vertices, rng=self.rng
             )
         except KeyError:
             raise ValueError(
                 "Generative model {} not supported".format(self.generative_model)
             )
         try:
-            W_noise = NOISE_FUNCTIONS[self.noise_model](g, W, self.noise, new_density)
+            W_noise = NOISE_FUNCTIONS[self.noise_model](g, W, self.noise, new_density, rng=self.rng)
         except KeyError:
             raise ValueError("Noise model {} not supported".format(self.noise_model))
         B = adjacency_matrix_to_tensor_representation(W)

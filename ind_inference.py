@@ -37,13 +37,20 @@ def main(cfg: DictConfig):
     ALL_nloop = np.zeros(n_ex)
     ALL_ind = np.zeros((l,n_ex,2,n_vertices))
 
-    all_ind, best_model, first_best_data, first_loop = chain.loop(cfg.dataset, DATA_PB_DIR, L = cfg.L, N_max=cfg.N_max, verbose = True)
+    result = chain.loop(cfg.dataset, DATA_PB_DIR, L = cfg.L, N_max=cfg.N_max, verbose = True)
+    all_ind = result.all_ind_data
+    best_model = result.best_model
+    first_best_data = result.best_data
     size = all_ind.shape[0]
     ALL_ind[:size,:] = all_ind
 
     for ind in range(n_ex):
         print(f"starting with sample {ind}")
-        all_ind, best_model, best_data, best_nloop = chain.loop_siamese(first_best_data, best_model, N_max=cfg.N_max, verbose = True, ind = ind)
+        result_s = chain.loop_siamese(first_best_data, best_model, N_max=cfg.N_max, verbose = True, ind = ind)
+        all_ind = result_s.all_ind_data
+        best_model = result_s.best_model
+        best_data = result_s.best_data
+        best_nloop = result_s.best_nloop
         #print(all_ind.shape)
         #print(first_loop)
         #print(best_nloop)

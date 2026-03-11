@@ -35,6 +35,33 @@ class GraphNorm(nn.Module):
         else:
             return normalize(b, constant_n_vertices=self.constant_n_vertices, eps=self.eps)
 
+def normalize_graph(
+    x: torch.Tensor,
+    constant_n_vertices: bool = True,
+    eps: float = 1e-5,
+) -> torch.Tensor:
+    """Stateless graph normalization (no learnable parameters).
+
+    Normalizes the input tensor over its last two spatial dimensions, using
+    per-sample mean and variance.  Shape: (b, f, n1, n2) or (b, f, n).
+
+    For learnable normalization with weight/bias, use GraphNorm.
+    Mirrors the PyTorch convention of nn.LayerNorm / F.layer_norm.
+
+    Args:
+        x: Input tensor of shape (b, f, n1, n2) or (b, f, n).
+        constant_n_vertices: If True, uses the static tensor size for the
+            normalisation denominator.  Set to False for dynamic / masked
+            graphs where the number of active nodes varies per sample.
+        eps: Small constant added inside the square root for numerical
+            stability.
+
+    Returns:
+        Normalised tensor with the same shape as *x*.
+    """
+    return normalize(x, constant_n_vertices=constant_n_vertices, eps=eps)
+
+
 def normalize(b, constant_n_vertices=True, eps =1e-05):
     # b.shape = (b,f,n1,n2) or (b,f,n)
     means = torch.mean(b, dim = (-1,-2), keepdim=True) #.detach()
