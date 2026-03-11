@@ -1,5 +1,7 @@
 """Inference and chaining utilities for iterative graph alignment."""
 
+from dataclasses import dataclass
+from typing import Optional
 import torch
 import numpy as np
 import copy
@@ -7,17 +9,42 @@ from toolbox.metrics import get_ranking, get_perm
 from loaders.representations import adjacency_matrix_to_tensor_representation_ind
 
 
+@dataclass(frozen=True)
+class InferenceResult:
+    """Structured return type for all_ind() / build_ind().
+
+    Attributes:
+        indices:    List of (src_idx, dst_idx) predicted node correspondences.
+        nce_scores: (n_samples,) edge-overlap NCE scores. None if not requested.
+        faq_scores: (n_samples,) FAQ scores. None if not requested.
+    """
+    indices: list
+    nce_scores: Optional[np.ndarray] = None
+    faq_scores: Optional[np.ndarray] = None
+
+    @property
+    def mean_nce(self) -> float:
+        if self.nce_scores is None:
+            raise ValueError("Set compute_nce=True to access mean_nce")
+        return float(np.mean(self.nce_scores))
+
+    @property
+    def num_samples(self) -> int:
+        return len(self.indices)
+
+
 def all_ind(
     loader,
     model,
     device,
+    *,
     compute_nce=False,
     random_order=False,
     use_faq=False,
     compute_faq=False,
     verbose=False,
     size_seed=0,
-):
+) -> InferenceResult:
     ind_data = []
     model = model.to(device)
     all_nce = []
@@ -61,11 +88,9 @@ def all_ind(
             print(
                 f"NCE FAQ : {np.mean(all_faq)}, NCE LAP : {np.mean(all_nce)}, acc : {np.mean(all_acc)}"
             )
-    if compute_nce:
-        all_nce = np.array(all_nce)
-        return ind_data, all_nce, np.array(all_faq) if compute_faq else None
-    else:
-        return ind_data, None
+    nce_scores = np.array(all_nce) if compute_nce else None
+    faq_scores = np.array(all_faq) if compute_faq else None
+    return InferenceResult(indices=ind_data, nce_scores=nce_scores, faq_scores=faq_scores)
 
 
 def make_data_from_ind(data, ind):

@@ -1,4 +1,4 @@
-root_dir: /scratch/lelarge/
+root_dir: /lustre/fsn1/projects/rech/tdm/uuz44ie/
 
 defaults:
   - _self_

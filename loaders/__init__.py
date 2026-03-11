@@ -1,6 +1,7 @@
 """Public API for the loaders package."""
 
 import os
+from typing import Optional
 from torch.utils.data import DataLoader
 import torch
 
@@ -24,14 +25,41 @@ def collate_fn(samples_list):
     )
 
 
-def siamese_loader(data, batch_size, shuffle=True, num_workers=8):
+def siamese_loader(
+    data: list,
+    batch_size: int,
+    train: bool = True,
+    num_workers: Optional[int] = None,
+    pin_memory: bool = True,
+    device=None,
+    # legacy alias kept for backward compatibility
+    shuffle: Optional[bool] = None,
+) -> DataLoader:
+    """
+    Args:
+        num_workers: If None, auto-detects based on os.cpu_count(). Pass 0 to disable multiprocessing.
+        pin_memory:  If True (default) and device is CUDA, enables async memory transfers.
+        device:      torch.device or None. If None, checks for CUDA availability.
+        shuffle:     Deprecated alias for ``train``. If provided, overrides ``train``.
+    """
     assert len(data) > 0
+    # honour legacy shuffle kwarg
+    if shuffle is not None:
+        train = shuffle
+    if num_workers is None:
+        num_workers = min(8, (os.cpu_count() or 1))
+    if device is None:
+        use_pin_memory = pin_memory and torch.cuda.is_available()
+    else:
+        use_pin_memory = pin_memory and (hasattr(device, 'type') and device.type == "cuda")
     return DataLoader(
         data,
         batch_size=batch_size,
-        shuffle=shuffle,
-        num_workers=num_workers,
+        shuffle=train,
         collate_fn=collate_fn,
+        num_workers=num_workers,
+        pin_memory=use_pin_memory,
+        persistent_workers=(num_workers > 0),
     )
 
 

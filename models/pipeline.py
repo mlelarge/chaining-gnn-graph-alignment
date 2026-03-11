@@ -1,10 +1,12 @@
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from omegaconf import OmegaConf, DictConfig
 import torch
 import os
 import wandb
-from typing import Any, Optional
+from typing import Any, Optional, TYPE_CHECKING
 import time
 
 from models import (
@@ -15,6 +17,7 @@ from models import (
     train_siamese,
 )
 from models.pl_model import Siamese_Node
+from models.config import LoopConfig, CollectionFlags
 from loaders.data_generator import GAP_Generator
 from loaders import siamese_loader, get_data
 import loaders.data_generator as dg
@@ -95,40 +98,44 @@ class Chaining(Pipeline):
         self,
         data,
         siamese,
-        verbose=False,
-        compute_nce=False,
-        use_faq=False,
-        compute_faq=False,
+        *,
+        verbose: bool = False,
+        compute_nce: bool = False,
+        use_faq: bool = False,
+        compute_faq: bool = False,
         size_seed: int = DEFAULT_SIZE_SEED,
-    ):
+    ) -> "tuple":
+        """Run a single inference pass and return (new_data, indices, nce_scores, faq_scores).
+
+        Returns
+        -------
+        new_data:
+            Dataset updated with the predicted node correspondences.
+        indices:
+            Per-sample index assignments when ``verbose=True``, else ``None``.
+        nce_scores:
+            Array of NCE scores when ``compute_nce=True``, else ``None``.
+        faq_scores:
+            Array of FAQ scores when ``compute_faq=True``, else ``None``.
+        """
         loader = siamese_loader(data, batch_size=self.batch_size, shuffle=False)
-        if compute_faq:
-            ind_data, nce, all_faq = dg.all_ind(
-                loader,
-                siamese,
-                self.device,
-                compute_nce=compute_nce,
-                compute_faq=compute_faq,
-                verbose=verbose,
-                size_seed=size_seed,
-            )
-        else:
-            result = dg.all_ind(
-                loader,
-                siamese,
-                self.device,
-                compute_nce,
-                use_faq=use_faq,
-                verbose=verbose,
-                size_seed=size_seed,
-            )
-            if compute_nce:
-                ind_data, nce, _ = result
-            else:
-                ind_data, nce = result
-            all_faq = None
-        new = dg.make_data_from_ind_label(data, ind_data)
-        return new, ind_data if verbose else None, nce, all_faq
+        result = dg.all_ind(
+            loader,
+            siamese,
+            self.device,
+            compute_nce=compute_nce,
+            use_faq=use_faq,
+            compute_faq=compute_faq,
+            verbose=verbose,
+            size_seed=size_seed,
+        )
+        new_data = dg.make_data_from_ind_label(data, result.indices)
+        return (
+            new_data,
+            result.indices if verbose else None,
+            result.nce_scores,
+            result.faq_scores,
+        )
 
     def train_data(self, data_train, siamese, L, data_val=None):
         train_loader = siamese_loader(
@@ -153,10 +160,10 @@ class Chaining(Pipeline):
             val_loader=val_loader,
         )
 
-        new_train, _, _, _ = self.build_ind(data_train, siamese)
+        new_train, *_ = self.build_ind(data_train, siamese)
         new_val = None
         if data_val is not None:
-            new_val, _, _, _ = self.build_ind(data_val, siamese)
+            new_val, *_ = self.build_ind(data_val, siamese)
         if self.cfg.training.wandb:
             wandb.finish()
         if new_val is not None:
@@ -289,7 +296,7 @@ class Chaining(Pipeline):
             new_data_test, current_ind, all_nce, all_faq = self.build_ind(
                 data_test,
                 siamese,
-                verbose,
+                verbose=verbose,
                 compute_nce=True,
                 compute_faq=compute_faq,
             )
@@ -327,7 +334,7 @@ class Chaining(Pipeline):
                 new_data_test, current_ind, all_nce, all_faq = self.build_ind(
                     data_test,
                     siamese,
-                    verbose,
+                    verbose=verbose,
                     compute_nce=True,
                     compute_faq=compute_faq,
                 )
@@ -366,19 +373,17 @@ class Chaining(Pipeline):
                 )
 
         test_loader = siamese_loader(best_data, batch_size=1, shuffle=False)
-        all_planted, all_qap, all_d, all_acc, all_accd, all_accmax = all_qap_chain(
-            test_loader, best_model, best_model.device
-        )
-        print(f"Best model has (average) nce: {all_qap.mean()}")
-        if len(all_acc) > 0:
-            print(f"Best model has acc: {all_acc.mean()}")
-            print(f"Best model has accmax: {all_accmax}")
+        eval_result = all_qap_chain(test_loader, best_model, best_model.device)
+        print(f"Best model has (average) nce: {eval_result.qap.mean()}")
+        if len(eval_result.acc) > 0:
+            print(f"Best model has acc: {eval_result.acc.mean()}")
+            print(f"Best model has accmax: {eval_result.accmax}")
 
         return LoopResult(
             best_model=best_model,
             best_data=best_data,
             best_nloop=best_nloop,
-            all_qap=all_qap,
+            all_qap=eval_result.qap,
             all_ind_data=np.array(all_ind_data) if verbose else None,
             all_nce_data=np.array(all_nce_data) if verbose else None,
             all_faq_data=(
@@ -412,7 +417,7 @@ class Chaining(Pipeline):
         all_ind_data = []
         for i in range(N_max):
             new_data_test, current_ind, all_nce, _ = self.build_ind(
-                data_test, siamese, verbose, compute_nce=True
+                data_test, siamese, verbose=verbose, compute_nce=True
             )
             test_nce = all_nce.mean()
             print(f"Model {i} has test nce: {test_nce}")

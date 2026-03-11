@@ -42,6 +42,25 @@ def block(in_features, depth_of_mlp, constant_n_vertices=True):
     }
 
 def block_res(in_features, depth_of_mlp, constant_n_vertices=True):
+    """Full residual block with two independent MLP branches and self-attention.
+
+    Architecture:
+        in → mlp1 ──┐
+        in → mlp2 ──┤→ mult (matmul) → cat([mult, in]) → mlp3 → add([in, mlp3])
+
+    Two separate MLP branches (mlp1, mlp2) are computed from the input and
+    their matrix product is concatenated with the skip connection before a
+    final projection.  A residual connection is added at the output.
+
+    Parameter count: 3 × MLP(in, in, depth)
+        - mlp1: MLP(in → in)
+        - mlp2: MLP(in → in)
+        - mlp3: MLP(2*in → in)
+
+    Use when: accuracy is the priority and memory / compute budgets are ample.
+    Compared to block_res_mem this variant uses one additional MLP branch,
+    which can improve expressivity at the cost of ~50% more parameters.
+    """
     return {
         'in': Identity(),
         'mlp1': (MlpBlock_Real(in_features, in_features, depth_of_mlp,
@@ -55,7 +74,9 @@ def block_res(in_features, depth_of_mlp, constant_n_vertices=True):
         'add': (Add(), ['in', 'mlp3'])
     }
 
-def block_res_mem(in_features, depth_of_mlp, constant_n_vertices=True):
+
+def _block_res_mem_impl(in_features, depth_of_mlp, constant_n_vertices=True):
+    """Internal implementation of the memory-efficient residual block."""
     return {
         'in': Identity(),
         'mlp2': (MlpBlock_Real(in_features, in_features, depth_of_mlp,
@@ -66,6 +87,30 @@ def block_res_mem(in_features, depth_of_mlp, constant_n_vertices=True):
             constant_n_vertices=constant_n_vertices),
         'add': (Add(), ['in', 'mlp3'])
     }
+
+
+def block_res_memory_efficient(in_features, depth_of_mlp, constant_n_vertices=True):
+    """Memory-efficient residual block with self-gating.
+
+    Architecture:
+        in → mlp2 → h2 → in ⊗ h2 (matmul) → cat([mult, in]) → mlp3 → add([in, mlp3])
+
+    A single MLP branch (mlp2) is computed from the input and its matrix
+    product with the raw input is used as the gating signal.  The result is
+    concatenated with the skip connection before a final projection, and a
+    residual connection is added at the output.
+
+    Parameter count: 2 × MLP(in, in, depth)  (~50% fewer than block_res)
+        - mlp2: MLP(in → in)
+        - mlp3: MLP(2*in → in)
+
+    Use when: memory is constrained or when training large batches.
+    """
+    return _block_res_mem_impl(in_features, depth_of_mlp, constant_n_vertices)
+
+
+# Backward-compatible alias
+block_res_mem = block_res_memory_efficient
 
 def base_model(num_blocks, in_features, depth_of_mlp, block, constant_n_vertices=True):
     d = {'in': Identity()}

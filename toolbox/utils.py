@@ -25,16 +25,14 @@ def save_json(json_file: Union[str, Path], data: Any) -> None:
 
 
 def perm2mat(p: np.ndarray) -> np.ndarray:
-    """Convert a permutation vector to a permutation matrix.
+    """Convert permutation vector to permutation matrix.
 
     Args:
-        p: 1D array where p[i] gives the column index for row i.
-
+        p: (n,) integer array, a permutation of range(n).
     Returns:
-        Binary (n, n) matrix P where P[i, p[i]] = 1.
+        (n, n) float array with P[i, p[i]] = 1.
     """
-    n = np.max(p.shape)
+    n = len(p)
     P = np.zeros((n, n))
-    for i in range(n):
-        P[i, p[i]] = 1
+    P[np.arange(n), p] = 1.0
     return P

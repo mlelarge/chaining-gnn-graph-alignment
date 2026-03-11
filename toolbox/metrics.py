@@ -1,9 +1,57 @@
 import torch
 import numpy as np
+from dataclasses import dataclass
+from typing import Optional
 from scipy.optimize import linear_sum_assignment, quadratic_assignment
 from scipy.special import log_softmax
 
 from toolbox.utils import perm2mat
+
+
+@dataclass
+class ChainEvaluationResult:
+    """Result of all_qap_chain().
+
+    Attributes:
+        planted:  (n,) edge overlap under planted ground-truth solution.
+        qap:      (n,) edge overlap under FAQ-refined assignment.
+        d:        (n,) edge overlap under linear assignment (LAP).
+        acc:      (n,) accuracy — FAQ assignment vs planted.
+        accd:     (n,) accuracy — LAP assignment vs planted.
+        accmax:   (n,) accuracy — argmax assignment vs planted.
+        nit:      (n,) FAQ iteration counts. None unless verbose=True.
+    """
+    planted: np.ndarray
+    qap: np.ndarray
+    d: np.ndarray
+    acc: np.ndarray
+    accd: np.ndarray
+    accmax: np.ndarray
+    nit: Optional[np.ndarray] = None
+
+
+@dataclass
+class ScipyEvaluationResult:
+    """Result of all_qap_scipy(). All fields always present."""
+    planted: np.ndarray
+    qap: np.ndarray
+    d: np.ndarray
+    acc: np.ndarray
+    accd: np.ndarray
+    fd: np.ndarray
+    fproj: np.ndarray
+    fqap: np.ndarray
+    fplanted: np.ndarray
+    conv_nit: Optional[np.ndarray] = None
+    nit: Optional[np.ndarray] = None
+
+
+@dataclass
+class FWRefinementResult:
+    """Result of Frank-Wolfe graph matching refinement."""
+    P: np.ndarray
+    col_ind: np.ndarray
+    convergence_iterations: Optional[int] = None
 
 
 def accuracy_max(weights, labels=None, aggregate_score=True):
@@ -58,28 +106,58 @@ def get_perm(ind_pair):
     return perm
 
 
-def get_ranking(weight, graph1, graph2, use_faq=False):
+def compute_assignment_cost(weight: np.ndarray) -> np.ndarray:
+    """Convert log-probability scores to cost matrix for LAP solver."""
+    return -weight
+
+
+def linear_assignment(cost: np.ndarray) -> tuple:
+    """Solve Linear Assignment Problem. Returns (row_ind, col_ind)."""
+    return linear_sum_assignment(cost)
+
+
+def faq_refinement(
+    col_ind: np.ndarray,
+    g1: np.ndarray,
+    g2: np.ndarray,
+) -> tuple:
+    """Refine LAP solution with Frank-Wolfe QAP.
+
+    Returns:
+        (refined_col_ind, n_iterations)
+    """
+    Pp = perm2mat(col_ind)
+    res = quadratic_assignment(g1, -g2, method="faq", options={"P0": Pp})
+    return res["col_ind"], res["nit"]
+
+
+def get_ranking(
+    weight: np.ndarray,
+    g1: np.ndarray,
+    g2: np.ndarray,
+    use_faq: bool = False,
+) -> tuple:
     """Solve linear assignment and rank nodes by edge overlap score.
 
     Args:
         weight: (n, n) cost matrix to maximize.
-        graph1, graph2: (n, n) adjacency matrices.
+        g1, g2: (n, n) adjacency matrices.
         use_faq: If True, refine the assignment using FAQ (quadratic_assignment).
 
     Returns:
         (row_ordering, col_ind):
         - row_ordering: Node indices sorted by ascending edge overlap score.
         - col_ind: Optimal column assignment (permutation).
-    """
-    _, col_ind = linear_sum_assignment(weight, maximize=True)
-    if use_faq:
-        Pp = perm2mat(col_ind)
-        res_qap = quadratic_assignment(
-            graph1, -graph2, method="faq", options={"P0": Pp}
-        )
-        col_ind = res_qap["col_ind"]
 
-    maxi = (graph1 * graph2[col_ind, :][:, col_ind]).sum(1)
+    Note:
+        Prefer: compute_assignment_cost + linear_assignment + faq_refinement.
+    """
+    cost = compute_assignment_cost(weight)
+    _, col_ind = linear_assignment(cost)
+    if use_faq:
+        col_ind, _ = faq_refinement(col_ind, g1, g2)
+
+    maxi = (g1 * g2[col_ind, :][:, col_ind]).sum(1)
     return np.argsort(maxi), col_ind
 
 
@@ -133,12 +211,11 @@ def all_qap_chain(loader, model, device, verbose=False):
         loader: Dataloader yielding (data1, data2, target) batches.
         model: Trained siamese network model.
         device: Torch device (cuda/cpu).
-        verbose: If True, also return FAQ iteration counts.
+        verbose: If True, also populate the nit field in the result.
 
     Returns:
-        Without verbose: 6 numpy arrays
-            (planted, qap, d, acc, accd, accmax).
-        With verbose: 7 numpy arrays (above + nit).
+        ChainEvaluationResult dataclass with fields:
+            planted, qap, d, acc, accd, accmax, nit (None unless verbose=True).
     """
     all_qap = []
     all_d = []
@@ -166,7 +243,7 @@ def all_qap_chain(loader, model, device, verbose=False):
                 pl = np.argmax(planted[i], 1)
             cost = -weight.cpu().detach().numpy()
             col_max = np.argmax(-cost, 1)
-            row_ind, col_ind = linear_sum_assignment(cost)
+            _, col_ind = linear_sum_assignment(cost)
             Pp = perm2mat(col_ind)
             res_qap = quadratic_assignment(
                 g1[i], -g2[i], method="faq", options={"P0": Pp}
@@ -182,22 +259,13 @@ def all_qap_chain(loader, model, device, verbose=False):
                 all_accmax.append(np.sum(pl == col_max) / n)
             if verbose:
                 all_nit.append(res_qap["nit"])
-    if verbose:
-        return (
-            np.array(all_planted),
-            np.array(all_qap),
-            np.array(all_d),
-            np.array(all_acc),
-            np.array(all_accd),
-            np.array(all_accmax),
-            np.array(all_nit),
-        )
-    else:
-        return (
-            np.array(all_planted),
-            np.array(all_qap),
-            np.array(all_d),
-            np.array(all_acc),
-            np.array(all_accd),
-            np.array(all_accmax),
-        )
+
+    return ChainEvaluationResult(
+        planted=np.array(all_planted),
+        qap=np.array(all_qap),
+        d=np.array(all_d),
+        acc=np.array(all_acc),
+        accd=np.array(all_accd),
+        accmax=np.array(all_accmax),
+        nit=np.array(all_nit) if verbose else None,
+    )

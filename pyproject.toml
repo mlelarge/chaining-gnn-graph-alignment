@@ -18,6 +18,9 @@ dependencies = [
     "wandb>=0.22.0",
 ]
 
+[tool.setuptools.packages.find]
+include = ["models*", "loaders*", "toolbox*"]
+
 [dependency-groups]
 dev = [
     "ipykernel>=6.30.1",
