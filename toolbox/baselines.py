@@ -12,6 +12,59 @@ from toolbox.frank_wolfe import (  # noqa: F401
 from toolbox.utils import perm2mat
 
 
+def evaluate_faq_inits(g1, g2, planted_perm, maxiter_faq=30):
+    """Compare FAQ initializations on one graph pair — the paper's D_cx-vs-J story.
+
+    Runs scipy's FAQ (`quadratic_assignment(method="faq")`) from three different
+    starting points and reports accuracy vs the planted permutation and the
+    edge-overlap ("common edges", nce) of each solution:
+
+    - **D_cx**: initialize FAQ at the convex Frank-Wolfe solution
+      (`toolbox.frank_wolfe.relaxed_normAPPB_FW_seeds`) — the paper's method.
+    - **J**: initialize FAQ at the barycenter ``J`` (scipy's default) — the baseline.
+    - **max**: initialize FAQ at the true permutation — the achievable edge-overlap
+      ceiling ("Max-nce").
+
+    Also returns the raw D_cx *projection* accuracy (the permutation read off the
+    Frank-Wolfe relaxation before FAQ refinement).
+
+    Args:
+        g1, g2: (n, n) adjacency matrices of the two graphs.
+        planted_perm: (n,) ground-truth permutation (argmax of the planted target).
+        maxiter_faq: FAQ refinement iteration cap for the D_cx initialization.
+
+    Returns:
+        dict with keys acc_dcx, acc_j, acc_proj, nce_dcx, nce_j, nce_max, nce_planted.
+    """
+    pl = planted_perm
+    n = len(pl)
+
+    def overlap(col):
+        return (g2 * g1[col, :][:, col]).sum() / 2
+
+    # D_cx: Frank-Wolfe convex solution as the FAQ init.
+    P, col_proj, _ = relaxed_normAPPB_FW_seeds(g1, g2)
+    col_dcx = quadratic_assignment(
+        g2, -g1, method="faq", options={"P0": P, "maxiter": maxiter_faq}
+    )["col_ind"]
+    # J: barycenter init (scipy default).
+    col_j = quadratic_assignment(g2, -g1, method="faq")["col_ind"]
+    # Max-nce: FAQ seeded from the true permutation.
+    col_max = quadratic_assignment(
+        g2, -g1, method="faq", options={"P0": perm2mat(pl)}
+    )["col_ind"]
+
+    return {
+        "acc_dcx": np.sum(pl == col_dcx) / n,
+        "acc_j": np.sum(pl == col_j) / n,
+        "acc_proj": np.sum(pl == col_proj) / n,
+        "nce_dcx": overlap(col_dcx),
+        "nce_j": overlap(col_j),
+        "nce_max": overlap(col_max),
+        "nce_planted": overlap(pl),
+    }
+
+
 def baseline(loader):
     """Compute baseline QAP metrics over a dataloader.
 

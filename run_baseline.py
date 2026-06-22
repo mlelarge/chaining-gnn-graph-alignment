@@ -10,11 +10,9 @@ import os
 
 import numpy as np
 from omegaconf import OmegaConf
-from scipy.optimize import quadratic_assignment
 
 from loaders import get_data, siamese_loader
-from toolbox.frank_wolfe import relaxed_normAPPB_FW_seeds
-from toolbox.utils import perm2mat
+from toolbox.baselines import evaluate_faq_inits
 
 
 def build_dataset_config(
@@ -84,12 +82,10 @@ def main():
     data_test = get_data(cfg_data, args.data_dir, split="test")
     test_loader = siamese_loader(data_test, batch_size=1, shuffle=False)
 
-    # Run FAQ baseline with streaming output
-    print("\nRunning FAQ baseline (Frank-Wolfe + FAQ) ...")
-    all_acc = []
-    all_accd = []
-    all_qap = []
-    all_planted = []
+    # Run FAQ baselines with streaming output: FAQ(D_cx) vs FAQ(J) vs Max-nce.
+    print("\nRunning FAQ baselines (D_cx init vs barycenter J init) ...")
+    acc_dcx, acc_j, acc_proj = [], [], []
+    nce_dcx, nce_j, nce_max, nce_planted = [], [], [], []
     sample_idx = 0
 
     for batch in test_loader:
@@ -97,50 +93,42 @@ def main():
         g1 = data1["input"][:, 0, :, :].cpu().detach().numpy()
         g2 = data2["input"][:, 0, :, :].cpu().detach().numpy()
         planted = target.cpu().detach().numpy()
-        n = planted.shape[-1]
         bs = planted.shape[0]
 
         for i in range(bs):
             sample_idx += 1
-            if planted[i].ndim == 2:
-                pl = np.argmax(planted[i], 0)
-            P, col, _ = relaxed_normAPPB_FW_seeds(g1[i], g2[i])
-            Pp = perm2mat(col)
-            res_qap = quadratic_assignment(
-                g2[i], -g1[i], method="faq", options={"P0": P, "maxiter": 30}
-            )
-            acc_faq = np.sum(pl == res_qap["col_ind"]) / n
-            acc_proj = np.sum(pl == col) / n
-            qap_score = (g2[i] * g1[i][res_qap["col_ind"], :][:, res_qap["col_ind"]]).sum() / 2
-            planted_score = (g2[i] * g1[i][pl, :][:, pl]).sum() / 2
-
-            all_acc.append(acc_faq)
-            all_accd.append(acc_proj)
-            all_qap.append(qap_score)
-            all_planted.append(planted_score)
+            pl = np.argmax(planted[i], 0) if planted[i].ndim == 2 else planted[i]
+            r = evaluate_faq_inits(g1[i], g2[i], pl)
+            acc_dcx.append(r["acc_dcx"])
+            acc_j.append(r["acc_j"])
+            acc_proj.append(r["acc_proj"])
+            nce_dcx.append(r["nce_dcx"])
+            nce_j.append(r["nce_j"])
+            nce_max.append(r["nce_max"])
+            nce_planted.append(r["nce_planted"])
 
             print(
                 f"  [{sample_idx}/{args.num_examples}] "
-                f"acc_faq={acc_faq:.4f}  acc_proj={acc_proj:.4f}  "
-                f"| running avg: acc_faq={np.mean(all_acc):.4f}  acc_proj={np.mean(all_accd):.4f}",
+                f"acc: D_cx={r['acc_dcx']:.4f} J={r['acc_j']:.4f} proj={r['acc_proj']:.4f} "
+                f"| avg: D_cx={np.mean(acc_dcx):.4f} J={np.mean(acc_j):.4f}",
                 flush=True,
             )
-
-    all_acc = np.array(all_acc)
-    all_accd = np.array(all_accd)
-    all_qap = np.array(all_qap)
-    all_planted = np.array(all_planted)
 
     print("\n" + "=" * 60)
     print("FAQ BASELINE RESULTS")
     print("=" * 60)
-    print(f"Release:          {args.release}")
-    print(f"Noise:            {noise_used}")
-    print(f"Test examples:    {args.num_examples}")
-    print(f"Acc (FAQ):        {all_acc.mean():.4f}")
-    print(f"Acc (projection): {all_accd.mean():.4f}")
-    print(f"QAP score (FAQ):  {all_qap.mean():.4f}")
-    print(f"Planted score:    {all_planted.mean():.4f}")
+    print(f"Release:             {args.release}")
+    print(f"Noise:               {noise_used}")
+    print(f"Test examples:       {sample_idx}")
+    print("-" * 60)
+    print(f"Acc  FAQ(D_cx):      {np.mean(acc_dcx):.4f}")
+    print(f"Acc  FAQ(J):         {np.mean(acc_j):.4f}")
+    print(f"Acc  D_cx projection:{np.mean(acc_proj):.4f}")
+    print("-" * 60)
+    print(f"NCE  FAQ(D_cx):      {np.mean(nce_dcx):.1f}")
+    print(f"NCE  FAQ(J):         {np.mean(nce_j):.1f}")
+    print(f"NCE  Max (true perm):{np.mean(nce_max):.1f}")
+    print(f"NCE  planted:        {np.mean(nce_planted):.1f}")
     print("=" * 60)
 
 
