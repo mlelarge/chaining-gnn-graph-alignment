@@ -414,13 +414,15 @@ class TestAllInd:
         data = [(graphs_A[i], graphs_B[i], perms[i]) for i in range(5)]
         loader = siamese_loader(data, batch_size=2, shuffle=False)
 
-        ind_data, nce, faq = all_ind(
+        result = all_ind(
             loader, siamese, "cpu",
             compute_nce=True,
             compute_faq=True,
             verbose=False,
             size_seed=0,
         )
+        ind_data = result.indices
+        nce = result.nce_scores
 
         ref_ind1 = load_numpy("all_ind_ind1")
         ref_ind2 = load_numpy("all_ind_ind2")
