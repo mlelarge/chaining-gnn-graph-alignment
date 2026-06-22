@@ -13,7 +13,7 @@ from omegaconf import OmegaConf
 from scipy.optimize import quadratic_assignment
 
 from loaders import get_data, siamese_loader
-from toolbox.baselines import relaxed_normAPPB_FW_seeds
+from toolbox.frank_wolfe import relaxed_normAPPB_FW_seeds
 from toolbox.utils import perm2mat
 
 
