@@ -229,7 +229,12 @@ def all_qap_chain(loader, model, device, verbose=False):
         has_target = len(batch) == 3
         data1["input"] = data1["input"].to(device)
         data2["input"] = data2["input"].to(device)
-        with torch.amp.autocast(device_type="cuda", dtype=torch.float16):
+        dev_type = torch.device(device).type
+        # fp16 autocast on CUDA (as before); a no-op pass-through on CPU/MPS so the
+        # same code runs on a laptop without the "CUDA is not available" warning.
+        with torch.autocast(
+            device_type=dev_type, dtype=torch.float16, enabled=(dev_type == "cuda")
+        ):
             rawscores = model(data1, data2)
         weights = torch.log_softmax(rawscores, -1)
         g1 = data1["input"][:, 0, :, :].cpu().detach().numpy()

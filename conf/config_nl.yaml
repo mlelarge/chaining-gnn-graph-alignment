@@ -1,4 +1,4 @@
-root_dir: /scratch/lelarge/
+root_dir: null
 
 defaults:
   - _self_
@@ -6,4 +6,4 @@ defaults:
   - model: fgnn
   - training: gpu
   - pipeline: chain_noseed
-  - hydra/run: cluster
+  - hydra/run: default
