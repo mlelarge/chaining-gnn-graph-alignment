@@ -23,11 +23,14 @@ dataset licenses and cite the original sources below.
   the **same node set**, so the base is an induced subgraph of every variant, the
   true node correspondence is the identity, and the maximum number of common edges
   is 8,323. Pairs are `(yeast0, yeast_q)`.
-- **Edge add/remove (the harder benchmark).** For `ca-netscience`, `inf-euroroad`
-  and the harder yeast benchmark (`yeast25LC` in the paper), we corrupt the graph
-  with the same Erdős–Rényi edge-addition-removal noise model used for the
-  synthetic graphs, at the graph's own average degree
-  (`loaders.generators.noise_erdos_renyi`).
+- **Edge add/remove (the harder benchmark, tab:realworld-noisy).** Erdős–Rényi
+  edge-addition-removal noise (`loaders.generators.noise_erdos_renyi`) at the
+  graph's own average degree. Faithful to the FUGAL `*_dataset.ipynb` notebooks:
+  - `ca-netscience` / `inf-euroroad`: `graph_A = G`, `graph_B = noised(G)`;
+    `noise1` = 0.1, `noise2` = 0.2.
+  - `yeast25LC` (`yeast0_25_noise*`): `graph_A = yeast0` (trusted base, 8,323
+    edges), `graph_B = noised(yeast25)` (the q=25% low-confidence variant);
+    `noise005` = 0.05, `noise01` = 0.1.
 
 ## Reproducibility note
 
