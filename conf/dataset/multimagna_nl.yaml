@@ -1,0 +1,6 @@
+type: nl
+data_subdir: MultiMagna
+no_seed: true
+train:
+  name: yeast0_25_prod_noise
+  num_examples: 6
