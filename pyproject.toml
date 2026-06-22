@@ -1,17 +1,20 @@
 [project]
 name = "chaining-gnn-graph-alignment"
 version = "0.1.0"
-description = "Add your description here"
+description = "Chaining (2-FWL) Graph Neural Networks for combinatorial graph alignment: training, inference, and FAQ / D_cx baselines."
+authors = [{ name = "Marc Lelarge", email = "marc.lelarge@gmail.com" }]
+license = { file = "LICENSE" }
+readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "hydra-core>=1.3.2",
     "lightning>=2.5.5",
     "more-itertools>=10.8.0",
+    "networkx>=3.5",
     "numpy>=2.3.3",
     "omegaconf>=2.3.0",
     "pandas>=2.3.2",
     "pyarrow>=21.0.0",
-    "pytorch-lightning>=2.5.5",
     "scipy>=1.16.2",
     "torch>=2.8.0",
     "tqdm>=4.67.1",

@@ -51,6 +51,21 @@ Number of common edges (higher is better) for regular random graphs:
 
 
 
+## Installation
+
+This project uses [uv](https://docs.astral.sh/uv/) for a reproducible
+environment (Python ≥ 3.12):
+
+```bash
+git clone <repo-url>
+cd chaining-gnn-graph-alignment
+uv sync            # creates .venv from the pinned uv.lock
+```
+
+Run scripts through the environment, e.g. `uv run python run_inference.py --help`,
+or activate the venv with `source .venv/bin/activate`. A plain
+`pip install -e .` into a Python ≥ 3.12 environment also works as a fallback.
+
 ## Project Structure
 
 ```

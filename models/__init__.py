@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import os
-import pytorch_lightning as pl
+import lightning.pytorch as pl
 import torch
-from pytorch_lightning.callbacks import (
+from lightning.pytorch.callbacks import (
     ModelCheckpoint,
     LearningRateMonitor,
     EarlyStopping,
