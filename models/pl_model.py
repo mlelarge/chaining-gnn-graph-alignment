@@ -1,13 +1,11 @@
 from __future__ import annotations
 
-import warnings
-
 import pytorch_lightning as pl
 import torch
 import torch.nn as nn
 from toolbox.metrics import accuracy_max
 from models.loss import combined_loss_with_sinkhorn
-from models.config import OptimizationConfig, TrainMode
+from models.config import OptimizationConfig, SiameseMode
 
 
 class Siamese_Node(pl.LightningModule):
@@ -16,31 +14,22 @@ class Siamese_Node(pl.LightningModule):
 
         self.node_embedder = node_emb
         self.opt_cfg = opt_cfg
-        self.mode = TrainMode.LABELED
+        self.mode = SiameseMode.LABELED
 
         self.loss = nn.CrossEntropyLoss(reduction="mean")
         self.metric = accuracy_max
 
-        # Save opt_cfg fields as hyperparameters; exclude node_emb (not serialisable).
-        self.save_hyperparameters(ignore=["node_emb"])
-
-    def set_training_mode(
-        self, lr=1e-3, scheduler_decay=0.5, scheduler_step=3, lr_stop=2e-5
-    ):
-        """Deprecated: pass an OptimizationConfig to __init__ instead."""
-        warnings.warn(
-            "set_training_mode() is deprecated; pass an OptimizationConfig to "
-            "__init__ instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        # Halve lr_stop so the scheduler's min_lr sits below the EarlyStopping
-        # threshold, ensuring the LR monitor triggers the stop first.
-        self.opt_cfg = OptimizationConfig(
-            lr=lr,
-            scheduler_decay=scheduler_decay,
-            scheduler_step=scheduler_step,
-            lr_min=lr_stop / 2,
+        # Save opt_cfg fields as flat hyperparameters.
+        # Exclude node_emb (not serialisable) and opt_cfg (frozen dataclass
+        # breaks Lightning's apply_to_collection during hparam logging).
+        self.save_hyperparameters(ignore=["node_emb", "opt_cfg"])
+        self.hparams.update(
+            {
+                "lr": opt_cfg.lr,
+                "scheduler_decay": opt_cfg.scheduler_decay,
+                "scheduler_step": opt_cfg.scheduler_step,
+                "lr_min": opt_cfg.lr_min,
+            }
         )
 
     def forward(self, x1, x2):
@@ -88,11 +77,7 @@ class Siamese_Node(pl.LightningModule):
         opt_cfg = self.opt_cfg
         optimizer = torch.optim.Adam(self.parameters(), lr=opt_cfg.lr, amsgrad=False)
 
-        # Select the monitor metric based on TrainMode rather than class name.
-        if self.mode == TrainMode.UNLABELED:
-            monitor = "train_loss"
-        else:
-            monitor = "val_loss"
+        monitor = "train_loss" if self.mode.is_unlabeled else "val_loss"
 
         return {
             "optimizer": optimizer,
@@ -115,7 +100,7 @@ class Siamese_Node_NL(Siamese_Node):
     def __init__(self, node_emb, opt_cfg: OptimizationConfig = OptimizationConfig()):
         super().__init__(node_emb, opt_cfg)
         self.loss_fn = combined_loss_with_sinkhorn
-        self.mode = TrainMode.UNLABELED
+        self.mode = SiameseMode.UNLABELED
 
     def training_step(self, batch, batch_idx):
         raw_scores = self(batch[0], batch[1])
@@ -128,8 +113,6 @@ class Siamese_Node_NL(Siamese_Node):
         self.log("train_loss", loss)
         self.log("train_matching_loss", matching_loss)
         self.log("train_bisto_loss", bisto_loss)
-        # (acc, n) = self.metric(M, batch[2])
-        # self.log("train_acc", acc / n)
 
         return loss
 
@@ -156,3 +139,5 @@ class Siamese_Node_NL(Siamese_Node):
         self.log("test_loss", loss)
         self.log("test_matching_loss", matching_loss)
         self.log("test_bisto_loss", bisto_loss)
+
+

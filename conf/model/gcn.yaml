@@ -1,0 +1,4 @@
+type: node_embedding_mpgnn
+conv_type: GCN
+num_blocks: 3
+in_features: 256

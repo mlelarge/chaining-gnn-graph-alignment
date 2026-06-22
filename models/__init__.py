@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import os
-import warnings
 import pytorch_lightning as pl
 import torch
 from pytorch_lightning.callbacks import (
@@ -12,11 +11,13 @@ from pytorch_lightning.callbacks import (
 from lightning.pytorch.loggers import CSVLogger, WandbLogger
 from models.utils import Network
 from models.block_net import node_embedding_node_pos, block_res_mem
+from models.mp_block_net import node_embedding_mpgnn
 from models.pl_model import Siamese_Node, Siamese_Node_NL
 from models.config import SiameseMode, OptimizationConfig
 
 get_node_emb = {
     "node_embedding_node_pos": node_embedding_node_pos,
+    "node_embedding_mpgnn": node_embedding_mpgnn,
 }
 
 get_block_inside = {
@@ -32,22 +33,38 @@ def get_model(cfg_model, original_features_num=2):
             f"node embedding {cfg_model['type']} is not implemented"
         )
 
-    try:
-        block_inside = get_block_inside[cfg_model["block_inside"]]
-    except KeyError:
-        raise NotImplementedError(
-            f"block inside {cfg_model['block_inside']} is not implemented"
-        )
-
+    # Build keyword arguments from the config, resolving block_inside if present.
     node_emb_args = {
         "original_features_num": original_features_num,
         "num_blocks": cfg_model["num_blocks"],
         "in_features": cfg_model["in_features"],
-        "depth_of_mlp": cfg_model["depth_of_mlp"],
-        "block_inside": block_inside,
     }
+
+    # FGNN-specific keys
+    if "block_inside" in cfg_model:
+        try:
+            node_emb_args["block_inside"] = get_block_inside[cfg_model["block_inside"]]
+        except KeyError:
+            raise NotImplementedError(
+                f"block inside {cfg_model['block_inside']} is not implemented"
+            )
+    if "depth_of_mlp" in cfg_model:
+        node_emb_args["depth_of_mlp"] = cfg_model["depth_of_mlp"]
+
+    # MP-GNN-specific keys
+    if "conv_type" in cfg_model:
+        node_emb_args["conv_type"] = cfg_model["conv_type"]
+    if "num_heads" in cfg_model:
+        node_emb_args["num_heads"] = cfg_model["num_heads"]
+
     node_emb_dic = {"input": (None, []), "ne": node_emb_type(**node_emb_args)}
     return Network(node_emb_dic)
+
+
+_SIAMESE_CLASS = {
+    SiameseMode.LABELED: Siamese_Node,
+    SiameseMode.UNLABELED: Siamese_Node_NL,
+}
 
 
 def get_siamese(node_emb, opt_cfg: OptimizationConfig | None = None,
@@ -56,21 +73,14 @@ def get_siamese(node_emb, opt_cfg: OptimizationConfig | None = None,
 
     Args:
         node_emb: Node embedding network (output of get_model).
-        opt_cfg: Optional OptimizationConfig.  When provided the model's
-            ``opt_cfg`` attribute is set so that ``configure_optimizers`` can
-            use it without a separate ``set_training_mode`` call.
-        mode: SiameseMode.LABELED (CrossEntropyLoss) or
-              SiameseMode.UNLABELED (Sinkhorn loss).
+        opt_cfg: OptimizationConfig for learning rate schedule.
+        mode: SiameseMode selecting class + loss.
 
     Returns:
-        A Siamese_Node or Siamese_Node_NL instance.
+        A Siamese model instance.
     """
-    if mode == SiameseMode.UNLABELED:
-        model = Siamese_Node_NL(node_emb)
-    else:
-        model = Siamese_Node(node_emb)
-    if opt_cfg is not None:
-        model.opt_cfg = opt_cfg
+    cls = _SIAMESE_CLASS[mode]
+    model = cls(node_emb) if opt_cfg is None else cls(node_emb, opt_cfg)
     return model
 
 
@@ -82,45 +92,22 @@ def get_siamese_name(path, config, opt_cfg: OptimizationConfig | None = None,
         path: Path to the ``.ckpt`` checkpoint file.
         config: Model config dict (passed to get_model).
         opt_cfg: Optional OptimizationConfig.
-        mode: SiameseMode.LABELED or SiameseMode.UNLABELED.
+        mode: SiameseMode selecting class + loss.
 
     Returns:
-        Loaded Siamese_Node or Siamese_Node_NL instance.
+        A loaded Siamese model instance.
     """
+    # Allow unpickling of OptimizationConfig (PyTorch >= 2.6 defaults to weights_only=True)
+    if hasattr(torch.serialization, "add_safe_globals"):
+        torch.serialization.add_safe_globals([OptimizationConfig])
+
     node_emb = get_model(config)
-    if mode == SiameseMode.UNLABELED:
-        model = Siamese_Node_NL.load_from_checkpoint(path, node_emb=node_emb)
-    else:
-        model = Siamese_Node.load_from_checkpoint(path, node_emb=node_emb)
+    cls = _SIAMESE_CLASS[mode]
+    model = cls.load_from_checkpoint(path, node_emb=node_emb)
     if opt_cfg is not None:
-        model.opt_cfg = opt_cfg
+        # frozen dataclass — replace the attribute on the Lightning module
+        object.__setattr__(model, "opt_cfg", opt_cfg)
     return model
-
-
-# ---------------------------------------------------------------------------
-# Deprecated single-mode helpers (kept for backward compatibility)
-# ---------------------------------------------------------------------------
-
-def get_siamese_nl(node_emb):
-    """Deprecated: use get_siamese(node_emb, mode=SiameseMode.UNLABELED)."""
-    warnings.warn(
-        "get_siamese_nl is deprecated; use "
-        "get_siamese(node_emb, mode=SiameseMode.UNLABELED) instead.",
-        DeprecationWarning,
-        stacklevel=2,
-    )
-    return get_siamese(node_emb, mode=SiameseMode.UNLABELED)
-
-
-def get_siamese_name_nl(path, config):
-    """Deprecated: use get_siamese_name(path, config, mode=SiameseMode.UNLABELED)."""
-    warnings.warn(
-        "get_siamese_name_nl is deprecated; use "
-        "get_siamese_name(path, config, mode=SiameseMode.UNLABELED) instead.",
-        DeprecationWarning,
-        stacklevel=2,
-    )
-    return get_siamese_name(path, config, mode=SiameseMode.UNLABELED)
 
 
 def train_siamese(
@@ -168,7 +155,7 @@ def train_siamese(
         monitor=monitor_key,
         mode="min",
         stopping_threshold=lr_stop,
-        patience=100,
+        patience=max_epochs,
         check_on_train_epoch_end=True,
     )
     if wandb:

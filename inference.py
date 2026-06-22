@@ -20,12 +20,11 @@ def main(cfg: DictConfig):
     path_models = os.path.join(PB_DIR, cfg.path_models)
     path_logs = os.path.join(PB_DIR, cfg.path_logs)
     check_dir(path_logs)
-    name_file = os.path.join(path_logs, f"new_results_L{cfg.L}.npy")
+    name_file = os.path.join(path_logs, f"last_results_L{cfg.L}.npy")
     chain = Chaining(path_models)
 
-    # list_noises = [0, 0.05, 0.1, 0.15, 0.2, 0.25 , 0.3, 0.35]
-    # list_noises = [0, 0.05, 0.1, 0.15, 0.2]
-    list_noises = [0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7]
+    # list_noises = [0, 0.05, 0.1, 0.15, 0.2, 0.25]
+    list_noises = [0.3, 0.35]
     l = len(list_noises)
     n_ex = cfg.dataset.test.num_examples
     ALL_qap = np.zeros((l, n_ex))
@@ -37,23 +36,23 @@ def main(cfg: DictConfig):
     ALL_nloop = np.zeros((l, n_ex))
     for i, noise in enumerate(list_noises):
         cfg.dataset.noise = noise
-        result = chain.loop(
-            cfg.dataset, DATA_PB_DIR, L=cfg.L, N_max=cfg.N_max
+        result = chain.loop(cfg.dataset, DATA_PB_DIR, L=cfg.L, N_max=cfg.N_max)
+        best_model, best_data, best_nloop = (
+            result.best_model,
+            result.best_data,
+            result.best_nloop,
         )
-        best_model, best_data, best_nloop = result.best_model, result.best_data, result.best_nloop
         test_loader = siamese_loader(best_data, batch_size=1, shuffle=False)
-        all_planted, all_qap, all_d, all_acc, all_accd, all_accmax, all_nit = (
-            all_qap_chain(test_loader, best_model, best_model.device, verbose=True)
-        )
-        ALL_qap[i, :] = all_qap
-        ALL_acc[i, :] = all_acc
-        ALL_qap_p[i, :] = all_d
-        ALL_acc_p[i, :] = all_accd
-        ALL_acc_max[i, :] = all_accmax
-        ALL_nit[i, :] = all_nit
+        res = all_qap_chain(test_loader, best_model, best_model.device, verbose=True)
+        ALL_qap[i, :] = res.qap
+        ALL_acc[i, :] = res.acc
+        ALL_qap_p[i, :] = res.d
+        ALL_acc_p[i, :] = res.accd
+        ALL_acc_max[i, :] = res.accmax
+        ALL_nit[i, :] = res.nit
         ALL_nloop[i, :] = best_nloop
         print(
-            f"Results for noise {noise}: acc_qap={all_acc.mean()}, acc_proj={all_accd.mean()}"
+            f"Results for noise {noise}: acc_qap={res.acc.mean()}, acc_proj={res.accd.mean()}"
         )
     with open(name_file, "wb") as f:
         np.save(f, list_noises)

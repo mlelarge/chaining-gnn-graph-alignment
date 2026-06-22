@@ -1,0 +1,5 @@
+type: node_embedding_mpgnn
+conv_type: GAT
+num_blocks: 8 #large # vlarge 16
+in_features: 256
+num_heads: 4
