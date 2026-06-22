@@ -4,3 +4,11 @@ no_seed: true
 train:
   name: yeast0_25_prod_noise
   num_examples: 6
+# val/test names must match the test parquet produced by repro/prepare_data (Phase 3);
+# mirrors the multimagna.yaml convention (<train_name>_test).
+val:
+  name: yeast0_25_prod_noise_test
+  num_examples: 2
+test:
+  name: yeast0_25_prod_noise_test
+  num_examples: 2
