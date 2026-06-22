@@ -162,6 +162,8 @@ def main():
         help="Base for the default output dir (<root>/experiments-gnn-gap/data). Default: ~",
     )
     parser.add_argument("--output-dir", default=None, help="Override the output directory directly.")
+    parser.add_argument("--n-train", type=int, default=None, help="Override the train-set size (default: paper size).")
+    parser.add_argument("--n-val", type=int, default=None, help="Override the val/test-set size (default: paper size).")
     args = parser.parse_args()
 
     if not args.all and not args.dataset:
@@ -173,7 +175,12 @@ def main():
     print(f"Output dir: {output_dir}\n")
 
     for key in (sorted(DATASETS) if args.all else [args.dataset]):
-        prepare(key, DATASETS[key], output_dir, rng)
+        spec = dict(DATASETS[key])
+        if args.n_train is not None:
+            spec["n_train"] = args.n_train
+        if args.n_val is not None:
+            spec["n_val"] = args.n_val
+        prepare(key, spec, output_dir, rng)
 
 
 if __name__ == "__main__":
