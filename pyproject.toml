@@ -16,6 +16,7 @@ dependencies = [
     "torch>=2.8.0",
     "tqdm>=4.67.1",
     "wandb>=0.22.0",
+    "torch-geometric>=2.5.0",
 ]
 
 [tool.setuptools.packages.find]
@@ -24,4 +25,5 @@ include = ["models*", "loaders*", "toolbox*"]
 [dependency-groups]
 dev = [
     "ipykernel>=6.30.1",
+    "pytest>=9.0.2",
 ]
