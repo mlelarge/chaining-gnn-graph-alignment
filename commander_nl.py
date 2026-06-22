@@ -2,7 +2,6 @@ from omegaconf import DictConfig, OmegaConf
 import hydra
 import os
 from pathlib import Path
-
 from models.pipeline import Chaining
 
 
@@ -15,9 +14,13 @@ def main(cfg: DictConfig):
     PB_DIR = os.path.join(ROOT_DIR, "experiments-gnn-gap/")
     DATA_PB_DIR = os.path.join(PB_DIR, "data/")
     path_models = os.path.join(PB_DIR, cfg.pipeline.path_models)
-    chain = Chaining(path_models, cfg.pipeline.L, use_labels=False)
+    negate_B = getattr(cfg.pipeline, "negate_B", False)
+    chain = Chaining(path_models, cfg.pipeline.L, use_labels=False, negate_B=negate_B)
     chain.train(cfg, DATA_PB_DIR)
-    chain.loop(cfg.dataset, DATA_PB_DIR)
+
+    # Use FAQ warm-start loop for QAPlib instances, NCE-based loop otherwise
+    use_faq = bool(getattr(cfg.dataset, "instance", None))
+    chain.loop(cfg.dataset, DATA_PB_DIR, use_faq_warmstart=use_faq)
 
 
 if __name__ == "__main__":

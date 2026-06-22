@@ -1,0 +1,16 @@
+# Parameterized QAPlib dataset config.
+# Override `instance` to select a specific QAPlib problem:
+#   python commander_nl.py dataset=qaplib dataset.instance=chr25a
+# Override `data_path` to point to the directory containing the parquets:
+#   python commander_nl.py dataset=qaplib dataset.data_path=/path/to/parquet_data
+instance: tai40a
+type: nl
+data_subdir: QAP
+data_path: null
+no_seed: true
+train:
+  name: ${..instance}_noise
+  num_examples: 500
+val:
+  name: ${..instance}_test
+  num_examples: 1
