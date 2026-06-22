@@ -110,8 +110,10 @@ def main():
     )
     parser.add_argument(
         "--data-dir",
-        default="/lustre/fsn1/projects/rech/tdm/uuz44ie/experiments-gnn-gap/data_nl/",
-        help="Path to QAPlib .dat files",
+        default=os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "qapdata"
+        ),
+        help="Path to QAPlib .dat files (default: <repo>/data/qapdata)",
     )
     parser.add_argument(
         "--output-dir",

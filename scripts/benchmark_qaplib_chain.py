@@ -32,8 +32,10 @@ def main():
     )
     parser.add_argument(
         "--qap-data-dir",
-        default="/Users/lelarge/data/qapdata/",
-        help="Path to QAPlib .dat files",
+        default=os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "qapdata"
+        ),
+        help="Path to QAPlib .dat files (default: <repo>/data/qapdata)",
     )
     parser.add_argument(
         "--parquet-dir",
@@ -87,10 +89,10 @@ def main():
     best_known = {}
     bk_path = args.best_known_path
     if bk_path is None:
-        # Try default location
+        # Default to the in-repo location (shipped under extras/qaplib/ in Phase 7).
         bk_path = os.path.join(
-            os.path.dirname(os.path.abspath(__file__)),
-            "..", "..", "QAP", "qaplib_best_known.json",
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            "extras", "qaplib", "qaplib_best_known.json",
         )
     if os.path.exists(bk_path):
         with open(bk_path) as f:

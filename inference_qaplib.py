@@ -32,12 +32,14 @@ def main(cfg: DictConfig):
     PB_DIR = os.path.join(ROOT_DIR, "experiments-gnn-gap/")
     DATA_PB_DIR = os.path.join(PB_DIR, "data/")
     path_models = os.path.join(PB_DIR, cfg.pipeline.path_models)
+    REPO_ROOT = os.path.dirname(os.path.abspath(__file__))
 
     # Determine instance name from config
     instance = getattr(cfg.dataset, "instance", cfg.dataset.val.name.replace("_test", ""))
 
-    # Load original QAPlib matrices
-    qap_data_dir = getattr(cfg, "qap_data_dir", "/Users/lelarge/data/qapdata/")
+    # Load original QAPlib matrices (place raw .dat files under <repo>/data/qapdata/,
+    # or override with `qap_data_dir=/path/to/qapdata` on the CLI).
+    qap_data_dir = getattr(cfg, "qap_data_dir", os.path.join(REPO_ROOT, "data", "qapdata"))
     dat_path = os.path.join(qap_data_dir, f"{instance}.dat")
     n, A_raw, B_raw = read_dat_file(dat_path)
     print(f"Instance: {instance} (n={n})")
@@ -45,8 +47,7 @@ def main(cfg: DictConfig):
     # Load best-known solutions if available
     best_known = None
     best_known_path = os.path.join(
-        os.path.dirname(os.path.abspath(__file__)),
-        "..", "QAP", "qaplib_best_known.json",
+        REPO_ROOT, "extras", "qaplib", "qaplib_best_known.json"
     )
     if os.path.exists(best_known_path):
         with open(best_known_path) as f:
