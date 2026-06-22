@@ -244,8 +244,6 @@ def all_qap_chain(loader, model, device, verbose=False):
             n = len(planted[0])
 
         for i, weight in enumerate(weights):
-            if has_target and planted[i].ndim == 2:
-                pl = np.argmax(planted[i], 1)
             cost = -weight.cpu().detach().numpy()
             col_max = np.argmax(-cost, 1)
             _, col_ind = linear_sum_assignment(cost)
@@ -258,6 +256,11 @@ def all_qap_chain(loader, model, device, verbose=False):
             )
             all_d.append((g1[i] * g2[i][col_ind, :][:, col_ind]).sum() / 2)
             if has_target:
+                if planted[i].ndim == 2:
+                    pl = np.argmax(planted[i], 1)
+                else:
+                    pl = planted[i].astype(int)
+                n = len(pl)
                 all_planted.append((g1[i] * g2[i][pl, :][:, pl]).sum() / 2)
                 all_acc.append(np.sum(pl == res_qap["col_ind"]) / n)
                 all_accd.append(np.sum(pl == col_ind) / n)
@@ -273,4 +276,81 @@ def all_qap_chain(loader, model, device, verbose=False):
         accd=np.array(all_accd),
         accmax=np.array(all_accmax),
         nit=np.array(all_nit) if verbose else None,
+    )
+
+
+@dataclass
+class QAPlibResult:
+    """Result of qaplib_evaluate().
+
+    Attributes:
+        obj_chain: QAP objective from chaining model (LAP on GNN scores).
+        obj_faq_warm: QAP objective from FAQ warm-started with GNN scores.
+        obj_faq_scratch: QAP objective from FAQ with no warm start.
+        perm_chain: Permutation from chaining (LAP).
+        perm_faq_warm: Permutation from FAQ warm start.
+        perm_faq_scratch: Permutation from FAQ scratch.
+    """
+    obj_chain: float
+    obj_faq_warm: float
+    obj_faq_scratch: float
+    perm_chain: np.ndarray
+    perm_faq_warm: np.ndarray
+    perm_faq_scratch: np.ndarray
+
+
+def qaplib_evaluate(loader, model, device, A_raw, B_raw):
+    """Evaluate a trained model on a QAPlib instance.
+
+    Runs the model to get matching scores, solves LAP, then refines with FAQ.
+    Also runs FAQ from scratch for comparison. Evaluates using the original
+    (non-tensor) QAPlib matrices A_raw and B_raw.
+
+    Args:
+        loader: Dataloader yielding the single test pair.
+        model: Trained siamese network.
+        device: Torch device.
+        A_raw: Original QAPlib flow matrix (n, n) numpy array.
+        B_raw: Original QAPlib distance matrix (n, n) numpy array.
+
+    Returns:
+        QAPlibResult with objectives and permutations.
+    """
+    model = model.to(device)
+    model.eval()
+
+    with torch.no_grad():
+        for batch in loader:
+            data1, data2 = batch[0], batch[1]
+            data1["input"] = data1["input"].to(device)
+            data2["input"] = data2["input"].to(device)
+            rawscores = model(data1, data2)
+            weights = torch.log_softmax(rawscores, -1)
+
+            # Only one sample expected
+            weight = weights[0].cpu().detach().numpy()
+
+            # LAP on GNN scores
+            cost = -weight
+            _, col_ind_lap = linear_sum_assignment(cost)
+
+            # FAQ warm-started from LAP solution
+            Pp = perm2mat(col_ind_lap)
+            res_faq_warm = quadratic_assignment(
+                A_raw, B_raw, method="faq", options={"P0": Pp}
+            )
+
+            # FAQ from scratch
+            res_faq_scratch = quadratic_assignment(A_raw, B_raw, method="faq")
+
+    def qap_obj(perm):
+        return (A_raw * B_raw[perm, :][:, perm]).sum()
+
+    return QAPlibResult(
+        obj_chain=float(qap_obj(col_ind_lap)),
+        obj_faq_warm=float(qap_obj(res_faq_warm["col_ind"])),
+        obj_faq_scratch=float(qap_obj(res_faq_scratch["col_ind"])),
+        perm_chain=col_ind_lap,
+        perm_faq_warm=res_faq_warm["col_ind"],
+        perm_faq_scratch=res_faq_scratch["col_ind"],
     )
