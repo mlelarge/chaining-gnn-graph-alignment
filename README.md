@@ -1,6 +1,6 @@
-# Combinatorial Graph Alignment with Sequential GNNs
+# Chaining 2-FWL GNNs for Combinatorial Graph Alignment
 
-This repository contains the code for the paper [Bootstrap Learning for Combinatorial Graph Alignment with Sequential GNNs](https://arxiv.org/abs/2510.03086).
+This repository contains the code for the paper [Chaining 2-FWL GNNs for Combinatorial Graph Alignment](https://arxiv.org/abs/2510.03086).
 
 ## The combinatorial Graph Alignment Problem (GAP)
 
@@ -189,11 +189,11 @@ chaining-gnn-graph-alignment/
 If you use this code in your research, please cite:
 
 ```bibtex
-@article{lelarge2024bootstrap,
-  title={Bootstrap Learning for Combinatorial Graph Alignment with Sequential GNNs},
+@article{lelarge2025chaining,
+  title={Chaining 2-FWL GNNs for Combinatorial Graph Alignment},
   author={Lelarge, Marc},
   journal={arXiv preprint arXiv:2510.03086},
-  year={2024},
+  year={2025},
   url={https://arxiv.org/abs/2510.03086}
 }
 ```
