@@ -63,6 +63,9 @@ python run_inference_real.py --release v1.1.0-canetscience-pn0.1 --data-dir ./da
 
 ## Reproducing the paper results
 
+Every results table maps to one `make` target — `make synthetic`, `make realworld`, or a single cell
+like `make ca-netscience` (run `make help` for the list). The commands each target runs are below.
+
 ### Synthetic graphs
 
 `run_inference.py` downloads a pretrained chained FGNN and runs the inference loop; `run_baseline.py`
@@ -130,33 +133,73 @@ python commander.py dataset=sparse                 # synthetic sparse ER
 python commander.py dataset=ca_netscience          # real-world (after prepare_data)
 ```
 
-## Performances on Synthetic datasets
+## Results — synthetic graphs
 
-Number of common edges (higher is better) for sparse Erdős-Rényi random graphs: 
-| noise        | 0   | 0.05 | 0.1 | 0.15 | 0.2 | 0.25 | 0.3 | 0.35 |
-|--------------|-----|------|-----|------|-----|------|-----|------|
-| Proj(D_cx) | 997 | 950 | 853 | 499 | 195 | 130 | 115 | 112 |
-| FAQ(D_cx)  | 997 | 950 | 898 | 847 | 723 | 504 | 487 | 485 |
-| ChFGNN Proj | 997 | 950 | 898 | 845 | 790 | 694 | 503 | 319 |
-| ChFGNN FAQ  | 997 | 950 | 899 | 849 | 800 | 730 | 626 | 534 |
+Accuracy / number of common edges (`acc / nce`) as a function of the noise `p`, from the paper's
+Table (tab:ER-Reg). `Proj` and `FAQ` are post-processing decoders; `FGNN` is a single network and
+`ChFGNN` the chained variant. Reproduce with `make synthetic` (or `make synthetic-sparse|dense|regular`).
 
-Number of common edges (higher is better) for dense Erdős-Rényi random graphs: 
+**Sparse Erdős–Rényi, average degree 4** (nce_max ≈ 1000):
 
-| noise        | 0     | 0.05  | 0.1   | 0.15  | 0.2   | 0.25  | 0.3   | 0.35  |
-|--------------|-------|-------|-------|-------|-------|-------|-------|-------|
-| Proj(D_cx) | 19964 | 18987 | 17966 | 8700  | 3888  | 3646  | 3633  | 3624  |
-| FAQ(D_cx)  | 19964 | 18987 | 17968 | 16990 | 15972 | 7922  | 6272  | 6276  |
-| ChFGNN Proj | 19964 | 18969 | 16241 | 13028 | 9561  | 6166  | 3615  | 3591  |
-| ChFGNN FAQ  | 19964 | 18987 | 17968 | 16990 | 15779 | 11227 | 6258  | 6255  |
+| p | 0 | 0.05 | 0.1 | 0.15 | 0.2 | 0.25 | 0.3 | 0.35 |
+|---|---|---|---|---|---|---|---|---|
+| Proj(D_cx) | 0.98/997 | 0.97/950 | 0.90/853 | 0.59/499 | 0.23/195 | 0.09/130 | 0.04/115 | 0.02/112 |
+| FAQ(D_cx) | 0.98/997 | 0.98/950 | 0.96/898 | 0.95/847 | 0.73/723 | 0.13/504 | 0.04/487 | 0.02/485 |
+| FGNN Proj | 0.98/997 | 0.94/925 | 0.74/674 | 0.44/365 | 0.23/193 | 0.12/134 | 0.06/114 | 0.03/103 |
+| FGNN FAQ | 0.98/997 | 0.98/950 | 0.96/898 | 0.95/847 | 0.81/755 | 0.24/535 | 0.07/494 | 0.03/485 |
+| ChFGNN Proj | 0.98/997 | 0.98/950 | 0.96/898 | 0.94/845 | 0.91/790 | 0.82/720 | 0.49/549 | 0.08/367 |
+| ChFGNN FAQ | 0.98/997 | 0.98/950 | 0.96/899 | 0.95/849 | 0.93/800 | 0.85/742 | 0.52/638 | 0.09/546 |
 
-Number of common edges (higher is better) for regular random graphs:
+**Dense Erdős–Rényi, average degree 80** (nce_max ≈ 20,000):
 
-| noise        | 0    | 0.05 | 0.1  | 0.15 | 0.2  |
-|--------------|------|------|------|------|------|
-| Proj(D_cx) | 51   | 51   | 50   | 49   | 50   |
-| FAQ(D_cx)  | 385  | 425  | 456  | 369  | 496  |
-| ChFGNN Proj | 2500 | 1343 | 563  | 192  | 114  |
-| ChFGNN FAQ  | 2500 | 2059 | 1438 | 850  | 837  |
+| p | 0 | 0.05 | 0.1 | 0.15 | 0.2 | 0.25 | 0.3 | 0.35 |
+|---|---|---|---|---|---|---|---|---|
+| Proj(D_cx) | 1.00/19964 | 1.00/18987 | 1.00/17966 | 0.61/8700 | 0.14/3888 | 0.04/3646 | 0.02/3633 | 0.01/3624 |
+| FAQ(D_cx) | 1.00/19964 | 1.00/18987 | 1.00/17968 | 1.00/16990 | 1.00/15972 | 0.21/7922 | 0.01/6272 | 0.01/6276 |
+| FGNN Proj | 1.00/19964 | 1.00/18979 | 0.73/11254 | 0.28/4674 | 0.10/3651 | 0.04/3521 | 0.02/3517 | 0.01/3505 |
+| FGNN FAQ | 1.00/19964 | 1.00/18987 | 1.00/17968 | 1.00/16990 | 0.95/15390 | 0.14/7031 | 0.01/6259 | 0.01/6254 |
+| ChFGNN Proj | 1.00/19964 | 1.00/18987 | 0.94/16241 | 0.83/13028 | 0.68/10291 | 0.37/6574 | 0.02/3690 | 0.01/3591 |
+| ChFGNN FAQ | 1.00/19964 | 1.00/18987 | 1.00/17968 | 1.00/16990 | 0.99/15972 | 0.62/11577 | 0.01/6263 | 0.01/6255 |
+
+**Regular graphs, degree 10** (nce_max = 2500):
+
+| p | 0 | 0.05 | 0.1 | 0.15 | 0.2 |
+|---|---|---|---|---|---|
+| Proj(D_cx) | 0.002/51 | 0.002/51 | 0.003/50 | 0.001/49 | 0.002/50 |
+| FAQ(D_cx) | 0.002/385 | 0.003/425 | 0.003/456 | 0.002/369 | 0.003/496 |
+| FGNN Proj | 1.00/2500 | 0.31/405 | 0.03/113 | 0.005/108 | 0.003/106 |
+| FGNN FAQ | 1.00/2500 | 0.95/2059 | 0.10/912 | 0.005/837 | 0.002/838 |
+| ChFGNN Proj | 1.00/2500 | 0.95/2034 | 0.54/1135 | 0.009/281 | 0.003/95 |
+| ChFGNN FAQ | 1.00/2500 | 0.95/2059 | 0.56/1383 | 0.008/871 | 0.003/836 |
+
+## Results — real-world graphs
+
+`acc / nce`. **ChFGNN-ER4** is the synthetic sparse-ER model transferred zero-shot
+(`v1.0.0-er500-d4-pn0.22`); **ChFGNN** is the dataset-specific model (the `v1.1.0-*` releases). FUGAL
+([idea-iitd/Fugal](https://github.com/idea-iitd/Fugal), `mu=1`) and SGWL are external baselines.
+Reproduce with `make realworld`.
+
+**Noisy real-world networks** (edge add/remove noise; tab:realworld-noisy):
+
+| Method | yeast25LC 5% | yeast25LC 10% | ca-netscience 10% | ca-netscience 20% | inf-euroroad 10% | inf-euroroad 20% |
+|---|---|---|---|---|---|---|
+| FUGAL | 53.1/7480 | 44.6/7035 | 60.3/794 | 37.7/629 | 18.3/818 | 2.9/714 |
+| FAQ(D_cx) | 49.8/7660 | 44.7/7245 | 65.2/822 | 45.6/687 | 55.8/1170 | 10.9/940 |
+| ChFGNN-ER4 | 47.6/7693 | 42.3/7297 | 63.5/818 | 44.1/688 | 40.0/1111 | 7.5/970 |
+| ChFGNN | 54.1/7732 | 51.3/7404 | 65.4/824 | 57.0/724 | 63.5/1213 | 15.4/963 |
+| Max nce | – /7909 | – /7498 | – /826 | – /730 | – /1272 | – /1137 |
+
+**MultiMAGNA yeast PPI** (edge-addition low-confidence variants; tab:multimagna-full). "training" =
+the variant used to train the dataset-specific ChFGNN (not a test cell):
+
+| Method | 5% conf | 10% conf | 15% conf | 20% conf | 25% conf |
+|---|---|---|---|---|---|
+| FAQ(J) | 37.5/7383 | 34.4/7245 | 29.1/6807 | 23.9/6689 | 36.4/7383 |
+| SGWL | 83.6/– | – | 66.6/– | – | 58.8/– |
+| FUGAL | 83.0/8311 | 77.7/8231 | 74.3/8172 | 70.9/8148 | 68.6/8095 |
+| FAQ(D_cx) | 84.2/8323 | 82.6/8317 | 78.0/8289 | 77.0/8294 | 76.1/8306 |
+| ChFGNN-ER4 | 80.3/8300 | 75.3/8288 | 67.2/8252 | 63.1/8213 | 53.1/8080 |
+| ChFGNN | training | training | training | 72.2/8300 | 69.8/8291 |
 
 ## Project Structure
 
@@ -178,6 +221,7 @@ chaining-gnn-graph-alignment/
 │   └── prepare_data.py     # raw edge lists -> train/val/test parquets
 ├── conf/                   # Hydra configuration files (config, dataset, model, training, pipeline)
 ├── data/raw/               # Committed raw real-world edge lists (+ SOURCES.md)
+├── Makefile                # One target per paper table (make help)
 ├── commander.py            # Training entry point (chaining)
 ├── run_inference.py        # Synthetic inference from a release
 ├── run_inference_real.py   # Real-world inference from a release
