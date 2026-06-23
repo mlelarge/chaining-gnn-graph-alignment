@@ -3,6 +3,7 @@
 # (no GPU needed). Override the interpreter with e.g. `make PYTHON='uv run python' ...`.
 #
 #   make env            # uv sync
+#   make verify         # quick end-to-end smoke test
 #   make synthetic      # Table tab:ER-Reg  (sparse / dense / regular)
 #   make realworld      # Table tab:realworld-noisy + tab:multimagna-full
 #
@@ -11,7 +12,7 @@
 PYTHON ?= python
 DATA   ?= ./data/prepared
 
-.PHONY: help env data \
+.PHONY: help env data verify \
         synthetic synthetic-sparse synthetic-dense synthetic-regular \
         realworld ca-netscience euroroad yeast25lc multimagna \
         train-sparse clean
@@ -19,6 +20,7 @@ DATA   ?= ./data/prepared
 help:
 	@echo "Targets:"
 	@echo "  env                 uv sync (create the environment)"
+	@echo "  verify              quick end-to-end smoke: pytest + a real-world round-trip"
 	@echo "  data                build all real-world parquets into $(DATA)"
 	@echo "  synthetic           tab:ER-Reg  — sparse + dense + regular"
 	@echo "  synthetic-sparse    sparse Erdos-Renyi (d=4)"
@@ -34,6 +36,13 @@ help:
 
 env:
 	uv sync
+
+# Quick end-to-end smoke test: tests, then prepare a tiny dataset and reproduce
+# one real-world cell from a published release.
+verify:
+	$(PYTHON) -m pytest tests/ -q
+	$(PYTHON) -m repro.prepare_data --dataset ca-netscience --n-train 2 --n-val 4 --output-dir $(DATA)
+	$(PYTHON) run_inference_real.py --release v1.1.0-canetscience-pn0.1 --data-dir $(DATA) --num-examples 4 --N-max 15
 
 data:
 	$(PYTHON) -m repro.prepare_data --all --output-dir $(DATA)
