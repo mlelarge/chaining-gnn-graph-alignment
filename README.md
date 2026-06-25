@@ -98,9 +98,17 @@ python run_inference_real.py --release v1.1.0-yeast25lc-pn0.05   --data-dir ./da
 python run_inference_real.py --release v1.1.0-multimagna         --data-dir ./data --test-name multimagna_yeast20_test
 ```
 
-The published numbers were produced with **no fixed seed** and a **single noise realization** per
-cell, so `prepare_data` defaults `--seed` to `None`; expect small run-to-run variation (the paper
-notes `nce` is the more reliable metric, as the base graphs have large automorphism groups).
+**Reproducibility / seeding.** The published numbers were produced with **no fixed seed** and a
+**single noise realization** per cell, so the default (`--seed None`) matches the paper — expect small
+run-to-run variation (the paper notes `nce` is the more reliable metric, as the base graphs have large
+automorphism groups). Pass `--seed <int>` for a deterministic rebuild: the seed now drives **every**
+random draw — the base graph (for synthetic), the edge add/remove noise, and the permutations.
+
+- **Real-world:** `python -m repro.prepare_data --dataset … --seed 0` → identical parquets every run.
+- **Synthetic:** `python run_inference.py --release … --seed 0` seeds the on-the-fly test-graph
+  generation. Generated data is cached under `--data_dir`, so use a fresh `--data_dir` when changing
+  the seed. (Inference itself is deterministic given the data on CPU; on GPU, fp16 may cause tiny
+  variation, but `nce` is an integer edge count and is robust.)
 
 ### Pretrained checkpoints
 
