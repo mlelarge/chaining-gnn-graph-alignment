@@ -153,11 +153,18 @@ def run_real(args, out_path):
             pm = download_release(rel, args.checkpoint_dir)
             cfgm = json.loads(json.dumps(OmegaConf.to_container(cfg)))
             loop_kw = {"N_max": args.N_max} if args.N_max is not None else {}
-            res = Chaining(pm).loop(OmegaConf.create(cfgm), args.data_dir, **loop_kw)
+            chain = Chaining(pm)
+            res = chain.loop(OmegaConf.create(cfgm), args.data_dir, **loop_kw)
             ev = all_qap_chain(siamese_loader(res.best_data, batch_size=1, shuffle=False),
                                res.best_model, res.best_model.device)
             rec[label] = [round(float(np.mean(ev.acc)), 4), round(float(np.mean(ev.qap)), 1)]
+            # Free this model's tensors before the next one (n=1174 euroroad OOM'd
+            # at 96G because the two models stacked up).
+            del chain, res, ev
+            gc.collect()
         _emit(out_path, rec)
+        del raw, base
+        gc.collect()
 
 
 def _cuda():

@@ -49,6 +49,13 @@ declare -A NUMEX=(
     [sparse]="$NUM"
     [dense]=10
 )
+# inf-euroroad (n=1174) needs far more RAM than the n=500 synthetic graphs.
+declare -A MEMOF=(
+    [regular]=96G
+    [real]=160G
+    [sparse]=96G
+    [dense]=96G
+)
 
 echo "Submitting jobs to '$PARTITION' (seed=$SEED, N_max=$NMAX, num=$NUM; dense num=${NUMEX[dense]}):"
 for EXP in regular real sparse dense; do
@@ -56,6 +63,7 @@ for EXP in regular real sparse dense; do
         --job-name="chgnn-$EXP" \
         --partition="$PARTITION" \
         --time="${WALLTIME[$EXP]}" \
+        --mem="${MEMOF[$EXP]}" \
         --export=ALL,EXP="$EXP",REPO="$REPO",CKPT="$CKPT",SEED="$SEED",NUM="${NUMEX[$EXP]}",NMAX="$NMAX" \
         cluster/cleps_repro.sbatch)
     echo "  $EXP -> job $jid (log: repro_chgnn-${EXP}_${jid}.out)"
