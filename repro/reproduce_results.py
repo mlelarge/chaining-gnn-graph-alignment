@@ -181,6 +181,7 @@ def main():
 
     families = sorted(SYNTHETIC) if (args.all or (not args.family and not args.real)) else ([args.family] if args.family else [])
     print(f"Writing results to {args.out} (seed={args.seed}, num_examples={args.num_examples})")
+    open(args.out, "w").close()  # start fresh — don't append to a previous run's file
     for fam in families:
         print(f"=== synthetic: {fam} ===")
         run_synthetic(fam, args, args.out)
