@@ -11,11 +11,14 @@
 
 PYTHON ?= python
 DATA   ?= ./data/prepared
+SEED         ?= 0
+NUM_EXAMPLES ?= 100
+OUT          ?= repro_results.jsonl
 
 .PHONY: help env data verify \
         synthetic synthetic-sparse synthetic-dense synthetic-regular \
         realworld ca-netscience euroroad yeast25lc multimagna \
-        train-sparse clean
+        train-sparse reproduce clean
 
 help:
 	@echo "Targets:"
@@ -32,6 +35,7 @@ help:
 	@echo "  yeast25lc           yeast25LC @ noise 0.05 and 0.1"
 	@echo "  multimagna          MultiMAGNA yeast (held-out 20% / 25%)"
 	@echo "  train-sparse        train ChFGNN from scratch on sparse ER (needs a GPU)"
+	@echo "  reproduce           seeded full-grid -> JSON (OUT=$(OUT), SEED=$(SEED), NUM_EXAMPLES=$(NUM_EXAMPLES))"
 	@echo "  clean               remove prepared data, checkpoints and outputs"
 
 env:
@@ -88,6 +92,12 @@ multimagna:
 # ---- Training from scratch (needs a GPU; no released checkpoints) -------------
 train-sparse:
 	$(PYTHON) commander.py dataset=sparse
+
+# Seeded reproduction of every results table -> JSONL (for the cluster). Split the
+# heavy dense cell off with e.g.: make reproduce ARGS, or call the module directly
+# with --family dense / --real. See `python -m repro.reproduce_results -h`.
+reproduce:
+	$(PYTHON) -m repro.reproduce_results --all --seed $(SEED) --num-examples $(NUM_EXAMPLES) --out $(OUT) --data-dir $(DATA)
 
 clean:
 	rm -rf $(DATA) ./checkpoints ./outputs
