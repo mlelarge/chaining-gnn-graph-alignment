@@ -23,7 +23,7 @@ Starting from input graphs G_A and G_B, we first (1) extract features and comput
 
 ### The D_cx initialization (FAQ)
 
-A recurring theme of the paper is that the classical **FAQ** solver is much stronger than recently reported once it is *initialized well*. We distinguish two initializations:
+The classical **FAQ** solver is much stronger than recently reported once it is *initialized well*. We distinguish two initializations:
 
 - **FAQ(J)** — FAQ started from the uninformative barycenter `J = 1·1ᵀ/n` (scipy's default).
 - **FAQ(D_cx)** — FAQ started from the solution of the **convex** relaxation
@@ -31,7 +31,7 @@ A recurring theme of the paper is that the classical **FAQ** solver is much stro
 
 The convex (`D_cx`) solver is isolated in [`toolbox/frank_wolfe.py`](toolbox/frank_wolfe.py)
 (`relaxed_normAPPB_FW_seeds` / `solve_dcx`). The `FAQ(D_cx)`-vs-`FAQ(J)` gap is reproduced by
-[`run_baseline.py`](run_baseline.py); chained FGNNs are then trained to improve on the strengthened
+[`run_baseline.py`](run_baseline.py); chained FGNNs are then shown to improve on the strengthened
 `FAQ(D_cx)` baseline.
 
 ## Installation
@@ -136,7 +136,7 @@ python commander.py dataset=ca_netscience          # real-world (after prepare_d
 ## Results — synthetic graphs
 
 Accuracy / number of common edges (`acc / nce`) as a function of the noise `p`, from the paper's
-Table (tab:ER-Reg). `Proj` and `FAQ` are post-processing decoders; `FGNN` is a single network and
+Table. `Proj` and `FAQ` are post-processing decoders; `FGNN` is a single network and
 `ChFGNN` the chained variant. Reproduce with `make synthetic` (or `make synthetic-sparse|dense|regular`).
 
 **Sparse Erdős–Rényi, average degree 4** (nce_max ≈ 1000):
