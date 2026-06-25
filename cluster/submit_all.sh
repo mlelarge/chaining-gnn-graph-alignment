@@ -13,7 +13,9 @@ set -euo pipefail
 REPO="${REPO:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 CKPT="${CKPT:-$REPO/checkpoints}"
 SEED="${SEED:-0}"
-NUM="${NUM:-30}"   # synthetic test pairs per cell; 100 OOM'd/was too slow at n=500
+NUM="${NUM:-30}"    # synthetic test pairs per cell (dense uses fewer; see NUMEX below)
+NMAX="${NMAX:-15}"  # chaining-refinement cap. The loop's nce stopping converges fast;
+                    # 80 (run_inference's default) didn't early-stop here -> ~46 min/cell.
 PARTITION="${PARTITION:-cpu_homogen}"   # CLEPS CPU partition (override if needed)
 
 cd "$REPO"
@@ -40,14 +42,21 @@ declare -A WALLTIME=(
     [sparse]=1-12:00:00
     [dense]=4-00:00:00
 )
+# Dense FAQ on degree-80 graphs is far heavier per pair, so use fewer examples there.
+declare -A NUMEX=(
+    [regular]="$NUM"
+    [real]="$NUM"
+    [sparse]="$NUM"
+    [dense]=10
+)
 
-echo "Submitting jobs to partition '$PARTITION' (seed=$SEED, num-examples=$NUM):"
+echo "Submitting jobs to '$PARTITION' (seed=$SEED, N_max=$NMAX, num=$NUM; dense num=${NUMEX[dense]}):"
 for EXP in regular real sparse dense; do
     jid=$(sbatch --parsable \
         --job-name="chgnn-$EXP" \
         --partition="$PARTITION" \
         --time="${WALLTIME[$EXP]}" \
-        --export=ALL,EXP="$EXP",REPO="$REPO",CKPT="$CKPT",SEED="$SEED",NUM="$NUM" \
+        --export=ALL,EXP="$EXP",REPO="$REPO",CKPT="$CKPT",SEED="$SEED",NUM="${NUMEX[$EXP]}",NMAX="$NMAX" \
         cluster/cleps_repro.sbatch)
     echo "  $EXP -> job $jid (log: repro_chgnn-${EXP}_${jid}.out)"
 done

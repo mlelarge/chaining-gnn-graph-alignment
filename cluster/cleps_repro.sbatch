@@ -20,7 +20,8 @@ EXP="${EXP:?set EXP=sparse|dense|regular|real}"
 REPO="${REPO:-$HOME/GitHub/chaining-gnn-graph-alignment}"
 CKPT="${CKPT:-$REPO/checkpoints}"
 SEED="${SEED:-0}"
-NUM="${NUM:-100}"
+NUM="${NUM:-30}"
+NMAX="${NMAX:-15}"
 
 cd "$REPO"
 
@@ -37,7 +38,7 @@ SEL=(--family "$EXP")
 [ "$EXP" = "real" ] && SEL=(--real)
 
 "$PY" -m repro.reproduce_results "${SEL[@]}" \
-    --seed "$SEED" --num-examples "$NUM" \
+    --seed "$SEED" --num-examples "$NUM" --N-max "$NMAX" \
     --checkpoint-dir "$CKPT" \
     --data-dir "./data/prepared_${EXP}" \
     --out "repro_${EXP}.jsonl"
