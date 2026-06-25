@@ -150,6 +150,11 @@ def main():
     )
     args = parser.parse_args()
 
+    if args.seed is not None:
+        from toolbox.utils import seed_everything
+
+        seed_everything(args.seed)
+
     # 1. Download models
     print(f"Fetching release {args.release} ...")
     path_models = download_release(args.release, args.checkpoint_dir)

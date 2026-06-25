@@ -36,3 +36,22 @@ def perm2mat(p: np.ndarray) -> np.ndarray:
     P = np.zeros((n, n))
     P[np.arange(n), p] = 1.0
     return P
+
+
+def seed_everything(seed: int) -> None:
+    """Seed Python, NumPy and Torch RNGs for reproducible inference.
+
+    Also seeds NumPy's and Python's global generators, which makes any
+    networkx graph draw (py_random_state) deterministic as a fallback. The
+    dataset generators take an explicit Generator derived from this seed, so
+    this is mainly belt-and-suspenders for the inference path.
+    """
+    import random
+
+    import torch
+
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)

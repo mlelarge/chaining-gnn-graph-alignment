@@ -46,7 +46,13 @@ def main():
     ap.add_argument("--L", type=int, default=None, help="Max chaining models (default: all).")
     ap.add_argument("--N-max", type=int, default=None, help="Max refinement iterations with the best model.")
     ap.add_argument("--negate-B", action="store_true", help="Negate channel 0 of graph B (default: off, the real-data convention).")
+    ap.add_argument("--seed", type=int, default=None, help="Seed Python/NumPy/Torch RNGs for the inference run.")
     args = ap.parse_args()
+
+    if args.seed is not None:
+        from toolbox.utils import seed_everything
+
+        seed_everything(args.seed)
 
     if args.release:
         from run_inference import download_release
