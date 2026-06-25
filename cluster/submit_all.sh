@@ -13,7 +13,7 @@ set -euo pipefail
 REPO="${REPO:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 CKPT="${CKPT:-$REPO/checkpoints}"
 SEED="${SEED:-0}"
-NUM="${NUM:-100}"
+NUM="${NUM:-30}"   # synthetic test pairs per cell; 100 OOM'd/was too slow at n=500
 PARTITION="${PARTITION:-cpu_homogen}"   # CLEPS CPU partition (override if needed)
 
 cd "$REPO"

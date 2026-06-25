@@ -23,6 +23,7 @@ Usage::
 """
 
 import argparse
+import gc
 import json
 import os
 
@@ -125,6 +126,9 @@ def run_synthetic(family, args, out_path):
             "chfgnn_proj": [round(chf["acc_proj"], 4), round(chf["nce_proj"], 1)],
             "chfgnn_faq":  [round(chf["acc_faq"], 4), round(chf["nce_faq"], 1)],
         })
+        # Free the per-cell data/models before the next noise level (avoids OOM).
+        del raw, chain, m0, res, fgnn, chf, base
+        gc.collect()
 
 
 def run_real(args, out_path):
@@ -169,7 +173,7 @@ def main():
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--num-examples", type=int, default=100, help="Test pairs per cell (default 100).")
     ap.add_argument("--noises", type=float, nargs="+", default=None, help="Override the synthetic noise sweep (quick checks).")
-    ap.add_argument("--N-max", type=int, default=None, help="Cap chaining refinement iterations (default: full).")
+    ap.add_argument("--N-max", type=int, default=80, help="Chaining refinement cap (default 80, like run_inference; the loop early-stops). N_max=None would SKIP refinement.")
     ap.add_argument("--checkpoint-dir", default="./checkpoints")
     ap.add_argument("--data-dir", default="./data/prepared")
     ap.add_argument("--out", default="repro_results.jsonl", help="Output JSONL file (appended).")
