@@ -34,7 +34,7 @@ def evaluate_faq_inits(g1, g2, planted_perm, maxiter_faq=30):
         maxiter_faq: FAQ refinement iteration cap for the D_cx initialization.
 
     Returns:
-        dict with keys acc_dcx, acc_j, acc_proj, nce_dcx, nce_j, nce_max, nce_planted.
+        dict with keys acc_dcx, acc_j, acc_proj, nce_dcx, nce_j, nce_proj, nce_max, nce_planted.
     """
     pl = planted_perm
     n = len(pl)
@@ -60,6 +60,7 @@ def evaluate_faq_inits(g1, g2, planted_perm, maxiter_faq=30):
         "acc_proj": np.sum(pl == col_proj) / n,
         "nce_dcx": overlap(col_dcx),
         "nce_j": overlap(col_j),
+        "nce_proj": overlap(col_proj),
         "nce_max": overlap(col_max),
         "nce_planted": overlap(pl),
     }
