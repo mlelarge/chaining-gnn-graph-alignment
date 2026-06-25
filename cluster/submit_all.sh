@@ -9,7 +9,8 @@
 # Overridable via env: REPO, CKPT, SEED, NUM, PARTITION.
 set -euo pipefail
 
-REPO="${REPO:-$HOME/GitHub/chaining-gnn-graph-alignment}"
+# Default to the repo this script lives in (so it works from any clone/rsync dir).
+REPO="${REPO:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 CKPT="${CKPT:-$REPO/checkpoints}"
 SEED="${SEED:-0}"
 NUM="${NUM:-100}"
