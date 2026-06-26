@@ -143,59 +143,71 @@ python commander.py dataset=ca_netscience          # real-world (after prepare_d
 
 ## Results — synthetic graphs
 
-Accuracy / number of common edges (`acc / nce`) as a function of the noise `p`, from the paper's
-Table. `Proj` and `FAQ` are post-processing decoders; `FGNN` is a single network and
-`ChFGNN` the chained variant. Reproduce with `make synthetic` (or `make synthetic-sparse|dense|regular`).
+Accuracy / number of common edges (`acc / nce`) as a function of the noise `p`. The numbers below are
+**reproduced** with `make reproduce` (fixed seed 0; 30 test pairs per cell, 10 for dense) from the run in
+[`repro/results/repro_seed0.jsonl`](repro/results/repro_seed0.jsonl), and reproduce the paper's Table.
+`Proj` and `FAQ` are post-processing decoders; `FGNN` is a single network and `ChFGNN` the chained
+variant. Regenerate the table with `make reproduce`; re-run the paper's settings with `make synthetic`.
 
 **Sparse Erdős–Rényi, average degree 4** (nce_max ≈ 1000):
 
 | p | 0 | 0.05 | 0.1 | 0.15 | 0.2 | 0.25 | 0.3 | 0.35 |
 |---|---|---|---|---|---|---|---|---|
-| Proj(D_cx) | 0.98/997 | 0.97/950 | 0.90/853 | 0.59/499 | 0.23/195 | 0.09/130 | 0.04/115 | 0.02/112 |
-| FAQ(D_cx) | 0.98/997 | 0.98/950 | 0.96/898 | 0.95/847 | 0.73/723 | 0.13/504 | 0.04/487 | 0.02/485 |
-| FGNN Proj | 0.98/997 | 0.94/925 | 0.74/674 | 0.44/365 | 0.23/193 | 0.12/134 | 0.06/114 | 0.03/103 |
-| FGNN FAQ | 0.98/997 | 0.98/950 | 0.96/898 | 0.95/847 | 0.81/755 | 0.24/535 | 0.07/494 | 0.03/485 |
-| ChFGNN Proj | 0.98/997 | 0.98/950 | 0.96/898 | 0.94/845 | 0.91/790 | 0.82/720 | 0.49/549 | 0.08/367 |
-| ChFGNN FAQ | 0.98/997 | 0.98/950 | 0.96/899 | 0.95/849 | 0.93/800 | 0.85/742 | 0.52/638 | 0.09/546 |
+| Proj(D_cx) | 0.98/994 | 0.98/944 | 0.91/849 | 0.58/482 | 0.22/195 | 0.088/132 | 0.040/117 | 0.021/117 |
+| FAQ(D_cx) | 0.98/994 | 0.97/945 | 0.97/895 | 0.94/841 | 0.64/683 | 0.12/499 | 0.037/484 | 0.015/481 |
+| FGNN Proj | 1.00/994 | 0.88/792 | 0.69/512 | 0.52/314 | 0.38/196 | 0.29/135 | 0.22/95 | 0.16/72 |
+| FGNN FAQ | 0.98/994 | 0.98/945 | 0.97/895 | 0.95/843 | 0.92/790 | 0.85/732 | 0.58/620 | 0.25/516 |
+| ChFGNN Proj | 0.98/994 | 0.98/945 | 0.97/894 | 0.95/840 | 0.91/783 | 0.85/722 | 0.40/451 | 0.035/261 |
+| ChFGNN FAQ | 0.98/994 | 0.98/945 | 0.97/895 | 0.95/844 | 0.93/792 | 0.88/744 | 0.44/608 | 0.033/520 |
 
 **Dense Erdős–Rényi, average degree 80** (nce_max ≈ 20,000):
 
 | p | 0 | 0.05 | 0.1 | 0.15 | 0.2 | 0.25 | 0.3 | 0.35 |
 |---|---|---|---|---|---|---|---|---|
-| Proj(D_cx) | 1.00/19964 | 1.00/18987 | 1.00/17966 | 0.61/8700 | 0.14/3888 | 0.04/3646 | 0.02/3633 | 0.01/3624 |
-| FAQ(D_cx) | 1.00/19964 | 1.00/18987 | 1.00/17968 | 1.00/16990 | 1.00/15972 | 0.21/7922 | 0.01/6272 | 0.01/6276 |
-| FGNN Proj | 1.00/19964 | 1.00/18979 | 0.73/11254 | 0.28/4674 | 0.10/3651 | 0.04/3521 | 0.02/3517 | 0.01/3505 |
-| FGNN FAQ | 1.00/19964 | 1.00/18987 | 1.00/17968 | 1.00/16990 | 0.95/15390 | 0.14/7031 | 0.01/6259 | 0.01/6254 |
-| ChFGNN Proj | 1.00/19964 | 1.00/18987 | 0.94/16241 | 0.83/13028 | 0.68/10291 | 0.37/6574 | 0.02/3690 | 0.01/3591 |
-| ChFGNN FAQ | 1.00/19964 | 1.00/18987 | 1.00/17968 | 1.00/16990 | 0.99/15972 | 0.62/11577 | 0.01/6263 | 0.01/6255 |
+| Proj(D_cx) | 1.00/19906 | 1.00/18904 | 1.00/17882 | 0.67/9827 | 0.17/3975 | 0.049/3664 | 0.024/3646 | 0.012/3604 |
+| FAQ(D_cx) | 1.00/19906 | 1.00/18904 | 1.00/17896 | 1.00/16912 | 1.00/15899 | 0.32/8854 | 0.014/6226 | 0.006/6218 |
+| FGNN Proj | 1.00/19906 | 1.00/18891 | 0.80/12764 | 0.45/6228 | 0.26/4296 | 0.15/3677 | 0.094/3517 | 0.056/3417 |
+| FGNN FAQ | 1.00/19906 | 1.00/18904 | 1.00/17896 | 1.00/16912 | 1.00/15899 | 1.00/14911 | 0.81/12365 | 0.12/6897 |
+| ChFGNN Proj | 1.00/19906 | 1.00/18904 | 0.95/16584 | 0.82/12699 | 0.73/10333 | 0.49/7026 | 0.082/4278 | 0.014/4037 |
+| ChFGNN FAQ | 1.00/19906 | 1.00/18904 | 1.00/17896 | 1.00/16912 | 1.00/15899 | 0.90/14050 | 0.22/7800 | 0.009/6272 |
 
 **Regular graphs, degree 10** (nce_max = 2500):
 
 | p | 0 | 0.05 | 0.1 | 0.15 | 0.2 |
 |---|---|---|---|---|---|
-| Proj(D_cx) | 0.002/51 | 0.002/51 | 0.003/50 | 0.001/49 | 0.002/50 |
-| FAQ(D_cx) | 0.002/385 | 0.003/425 | 0.003/456 | 0.002/369 | 0.003/496 |
-| FGNN Proj | 1.00/2500 | 0.31/405 | 0.03/113 | 0.005/108 | 0.003/106 |
-| FGNN FAQ | 1.00/2500 | 0.95/2059 | 0.10/912 | 0.005/837 | 0.002/838 |
-| ChFGNN Proj | 1.00/2500 | 0.95/2034 | 0.54/1135 | 0.009/281 | 0.003/95 |
-| ChFGNN FAQ | 1.00/2500 | 0.95/2059 | 0.56/1383 | 0.008/871 | 0.003/836 |
+| Proj(D_cx) | 0.002/51 | 0.002/51 | 0.002/51 | 0.002/50 | 0.002/50 |
+| FAQ(D_cx) | 0.002/623 | 0.002/491 | 0.002/571 | 0.002/646 | 0.002/409 |
+| FGNN Proj | 1.00/2500 | 0.40/465 | 0.16/133 | 0.085/82 | 0.068/72 |
+| FGNN FAQ | 1.00/2500 | 0.95/2052 | 0.89/1693 | 0.10/849 | 0.032/834 |
+| ChFGNN Proj | 1.00/2500 | 0.72/1329 | 0.27/518 | 0.005/296 | 0.004/290 |
+| ChFGNN FAQ | 1.00/2500 | 0.96/2052 | 0.60/1416 | 0.003/865 | 0.003/869 |
+
+> **Two caveats** for the reproduced numbers (fixed seed, reduced sample — close to but not bit-identical
+> to the unseeded paper):
+> 1. On **regular** graphs the convex relaxation is degenerate, so `Proj(D_cx)`/`FAQ(D_cx)` collapse to a
+>    near-random alignment; their `nce` is high-variance and only approximate (this *is* the paper's point —
+>    `ChFGNN` is what succeeds, `1.00/2500` at `p=0`).
+> 2. At the **FAQ phase transition** (sparse ≈ 0.3, regular ≈ 0.1, dense ≈ 0.25–0.3) the single-network
+>    `FGNN FAQ` row is bimodal and sample-sensitive — with the reduced sample it can sit above `ChFGNN` at a
+>    cell. `ChFGNN` and `FAQ(D_cx)` reproduce stably across the sweep.
 
 ## Results — real-world graphs
 
-`acc / nce`. **ChFGNN-ER4** is the synthetic sparse-ER model transferred zero-shot
-(`v1.0.0-er500-d4-pn0.22`); **ChFGNN** is the dataset-specific model (the `v1.1.0-*` releases). FUGAL
-([idea-iitd/Fugal](https://github.com/idea-iitd/Fugal), `mu=1`) and SGWL are external baselines.
-Reproduce with `make realworld`.
+`acc / nce` (acc as %). `FAQ(D_cx)`, `ChFGNN-ER4`, `ChFGNN` and `Max nce` are **reproduced** with
+`make reproduce` (seed 0); **ChFGNN-ER4** is the synthetic sparse-ER model transferred zero-shot
+(`v1.0.0-er500-d4-pn0.22`), **ChFGNN** the dataset-specific model (the `v1.1.0-*` releases). FUGAL
+([idea-iitd/Fugal](https://github.com/idea-iitd/Fugal), `mu=1`) and SGWL are **external** baselines, quoted
+from the paper. Reproduce with `make realworld`.
 
 **Noisy real-world networks** (edge add/remove noise; tab:realworld-noisy):
 
 | Method | yeast25LC 5% | yeast25LC 10% | ca-netscience 10% | ca-netscience 20% | inf-euroroad 10% | inf-euroroad 20% |
 |---|---|---|---|---|---|---|
 | FUGAL | 53.1/7480 | 44.6/7035 | 60.3/794 | 37.7/629 | 18.3/818 | 2.9/714 |
-| FAQ(D_cx) | 49.8/7660 | 44.7/7245 | 65.2/822 | 45.6/687 | 55.8/1170 | 10.9/940 |
-| ChFGNN-ER4 | 47.6/7693 | 42.3/7297 | 63.5/818 | 44.1/688 | 40.0/1111 | 7.5/970 |
-| ChFGNN | 54.1/7732 | 51.3/7404 | 65.4/824 | 57.0/724 | 63.5/1213 | 15.4/963 |
-| Max nce | – /7909 | – /7498 | – /826 | – /730 | – /1272 | – /1137 |
+| FAQ(D_cx) | 65.0/7873 | 57.0/7434 | 63.8/817 | 45.2/685 | 57.4/1174 | 15.5/972 |
+| ChFGNN-ER4 | 48.3/7669 | 44.5/7278 | 63.5/814 | 46.0/690 | 39.7/1103 | 13.5/980 |
+| ChFGNN | 60.3/7848 | 52.9/7416 | 67.2/821 | 59.3/725 | 59.7/1197 | 18.0/993 |
+| Max nce | – /7918 | – /7510 | – /824 | – /733 | – /1269 | – /1142 |
 
 **MultiMAGNA yeast PPI** (edge-addition low-confidence variants; tab:multimagna-full). "training" =
 the variant used to train the dataset-specific ChFGNN (not a test cell):

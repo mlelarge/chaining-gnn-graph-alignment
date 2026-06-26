@@ -18,7 +18,7 @@ OUT          ?= repro_results.jsonl
 .PHONY: help env data verify \
         synthetic synthetic-sparse synthetic-dense synthetic-regular \
         realworld ca-netscience euroroad yeast25lc multimagna \
-        train-sparse reproduce clean
+        train-sparse reproduce tables clean
 
 help:
 	@echo "Targets:"
@@ -98,6 +98,11 @@ train-sparse:
 # with --family dense / --real. See `python -m repro.reproduce_results -h`.
 reproduce:
 	$(PYTHON) -m repro.reproduce_results --all --seed $(SEED) --num-examples $(NUM_EXAMPLES) --out $(OUT) --data-dir $(DATA)
+
+# Render a reproduction JSONL into the README's markdown tables.
+# Defaults to the committed run; pass a file with e.g. `make tables OUT=repro_results.jsonl`.
+tables:
+	$(PYTHON) repro/format_tables.py repro/results/repro_seed0.jsonl
 
 clean:
 	rm -rf $(DATA) ./checkpoints ./outputs
