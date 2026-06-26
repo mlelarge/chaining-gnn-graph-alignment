@@ -1,14 +1,19 @@
 #!/usr/bin/env python3
-"""Render the reproduction JSONL (from reproduce_results.py) into the README's
-markdown tables. ER-Reg accuracies are fractions; real-world accuracies are
-percentages (matching the paper's table conventions).
+"""Render the reproduction JSONL into the README's markdown tables.
 
-    python repro/format_tables.py [results.jsonl]   # default repro/results/repro_seed0.jsonl
+Each cell's record stores per-pair arrays under ``methods.<name>.{acc,nce}``
+(older runs used flat ``<name>: [acc_mean, nce_mean]``). Means are computed from
+the arrays; with ``--ci`` (and >1 sample) cells show ``mean±h`` where
+``h = 1.96*std/sqrt(n)`` (95% CI half-width). ER-Reg accuracies are fractions;
+real-world accuracies are percentages (matching the paper's conventions).
+
+    python repro/format_tables.py [results.jsonl] [--ci]
 """
 
+import argparse
 import json
+import math
 import os
-import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 DEFAULT = os.path.join(HERE, "results", "repro_seed0.jsonl")
@@ -36,18 +41,45 @@ REAL_COLS = [  # header -> cell key (paper column order)
 ]
 
 
-def fmt_frac(a):
+def _mean(a):
+    return sum(a) / len(a)
+
+
+def _pstd(a):
+    m = _mean(a)
+    return math.sqrt(sum((x - m) ** 2 for x in a) / len(a))
+
+
+def _fmt_frac(a):
     return f"{a:.3f}" if a < 0.1 else f"{a:.2f}"
 
 
-def cell_frac(pair):
-    a, n = pair
-    return f"{fmt_frac(a)}/{n:.0f}"
+def _series(rec, key):
+    """(acc_array, nce_array) for a method — new methods-schema or old flat means."""
+    if "methods" in rec:
+        m = rec["methods"][key]
+        return m.get("acc"), m["nce"]
+    v = rec[key]
+    return [v[0]], [v[1]]
 
 
-def cell_pct(pair):
-    a, n = pair
-    return f"{a * 100:.1f}/{n:.0f}"
+def cell(rec, key, ci, pct=False):
+    acc, nce = _series(rec, key)
+    a, m_nce = _mean(acc), _mean(nce)
+    av = f"{a * 100:.1f}" if pct else _fmt_frac(a)
+    if ci and len(acc) > 1:
+        k = len(acc)
+        ha = 1.96 * _pstd(acc) / math.sqrt(k) * (100 if pct else 1)
+        hn = 1.96 * _pstd(nce) / math.sqrt(k)
+        av = f"{av}±{ha:.1f}" if pct else f"{av}±{ha:.2f}"
+        return f"{av}/{m_nce:.0f}±{hn:.0f}"
+    return f"{av}/{m_nce:.0f}"
+
+
+def _max_nce(rec):
+    if "methods" in rec:
+        return _mean(rec["methods"]["max"]["nce"])
+    return rec["max_nce"]
 
 
 def load(path):
@@ -65,36 +97,39 @@ def load(path):
     return erreg, real
 
 
-def synthetic_table(family, cells):
+def synthetic_table(family, cells, ci):
     noises = sorted(cells)
     head = "| p | " + " | ".join("%g" % p for p in noises) + " |"
     sep = "|---|" + "|".join("---" for _ in noises) + "|"
     lines = [FAMILY_TITLE[family], "", head, sep]
     for label, key in ERREG_ROWS:
-        lines.append("| " + label + " | " + " | ".join(cell_frac(cells[p][key]) for p in noises) + " |")
+        lines.append("| " + label + " | " + " | ".join(cell(cells[p], key, ci) for p in noises) + " |")
     return "\n".join(lines)
 
 
-def real_table(real):
+def real_table(real, ci):
     cols = [c for c in REAL_COLS if c[1] in real]
     head = "| Method | " + " | ".join(h for h, _ in cols) + " |"
     sep = "|---|" + "|".join("---" for _ in cols) + "|"
     lines = ["**Noisy real-world networks** (edge add/remove noise; tab:realworld-noisy)", "", head, sep]
     for label, key in [("FAQ(D_cx)", "faq_dcx"), ("ChFGNN-ER4", "chfgnn_er4"), ("ChFGNN", "chfgnn")]:
-        lines.append("| " + label + " | " + " | ".join(cell_pct(real[c][key]) for _, c in cols) + " |")
-    lines.append("| Max nce | " + " | ".join(f"– /{real[c]['max_nce']:.0f}" for _, c in cols) + " |")
+        lines.append("| " + label + " | " + " | ".join(cell(real[c], key, ci, pct=True) for _, c in cols) + " |")
+    lines.append("| Max nce | " + " | ".join(f"– /{_max_nce(real[c]):.0f}" for _, c in cols) + " |")
     return "\n".join(lines)
 
 
 def main():
-    path = sys.argv[1] if len(sys.argv) > 1 else DEFAULT
-    erreg, real = load(path)
+    ap = argparse.ArgumentParser(description="Render reproduction JSONL to README tables.")
+    ap.add_argument("path", nargs="?", default=DEFAULT)
+    ap.add_argument("--ci", action="store_true", help="Append 95%% CI half-widths (needs per-sample arrays).")
+    args = ap.parse_args()
+    erreg, real = load(args.path)
     for fam in ["sparse", "dense", "regular"]:
         if fam in erreg:
-            print(synthetic_table(fam, erreg[fam]))
+            print(synthetic_table(fam, erreg[fam], args.ci))
             print()
     if real:
-        print(real_table(real))
+        print(real_table(real, args.ci))
 
 
 if __name__ == "__main__":

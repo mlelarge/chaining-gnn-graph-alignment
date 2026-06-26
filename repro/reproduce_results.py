@@ -66,8 +66,21 @@ def _emit(out_path, record):
     print("  ->", json.dumps(record))
 
 
+def _arr(a, nd):
+    return [round(float(x), nd) for x in a]
+
+
+def _method(acc_arr, nce_arr):
+    """Per-pair {acc:[...], nce:[...]} for one decoder row. We keep the FULL
+    per-sample arrays (not just mean/std) so means, CIs and paired cross-method
+    comparisons (do methods fail on the *same* pairs?) are all derivable. Arrays
+    are in dataset order, so index i is the same graph pair across every method."""
+    return {"acc": _arr(acc_arr, 4), "nce": _arr(nce_arr, 1)}
+
+
 def _baselines(data, maxiter_faq=30):
-    """FAQ baselines over a dataset's (A, B, planted) pairs (mirrors run_baseline)."""
+    """FAQ baselines over a dataset's (A, B, planted) pairs (mirrors run_baseline).
+    Returns {key: [per-pair values]} in dataset order (aligned across methods)."""
     keys = ["acc_proj", "nce_proj", "acc_dcx", "nce_dcx", "nce_max"]
     acc = {k: [] for k in keys}
     for item in data:
@@ -77,15 +90,15 @@ def _baselines(data, maxiter_faq=30):
         r = evaluate_faq_inits(g1, g2, pl, maxiter_faq=maxiter_faq)
         for k in keys:
             acc[k].append(r[k])
-    return {k: float(np.mean(v)) for k, v in acc.items()}
+    return acc
 
 
 def _model_metrics(loader, model):
     device = next(model.parameters()).device
     ev = all_qap_chain(loader, model, device)
     return {
-        "acc_faq": float(np.mean(ev.acc)), "nce_faq": float(np.mean(ev.qap)),
-        "acc_proj": float(np.mean(ev.accd)), "nce_proj": float(np.mean(ev.d)),
+        "acc_faq": ev.acc, "nce_faq": ev.qap,
+        "acc_proj": ev.accd, "nce_proj": ev.d,
     }
 
 
@@ -119,12 +132,14 @@ def run_synthetic(family, args, out_path):
         _emit(out_path, {
             "table": "ER-Reg", "family": family, "noise": noise,
             "num_examples": args.num_examples, "seed": args.seed,
-            "proj_dcx": [round(base["acc_proj"], 4), round(base["nce_proj"], 1)],
-            "faq_dcx":  [round(base["acc_dcx"], 4), round(base["nce_dcx"], 1)],
-            "fgnn_proj": [round(fgnn["acc_proj"], 4), round(fgnn["nce_proj"], 1)],
-            "fgnn_faq":  [round(fgnn["acc_faq"], 4), round(fgnn["nce_faq"], 1)],
-            "chfgnn_proj": [round(chf["acc_proj"], 4), round(chf["nce_proj"], 1)],
-            "chfgnn_faq":  [round(chf["acc_faq"], 4), round(chf["nce_faq"], 1)],
+            "methods": {
+                "proj_dcx":    _method(base["acc_proj"], base["nce_proj"]),
+                "faq_dcx":     _method(base["acc_dcx"], base["nce_dcx"]),
+                "fgnn_proj":   _method(fgnn["acc_proj"], fgnn["nce_proj"]),
+                "fgnn_faq":    _method(fgnn["acc_faq"], fgnn["nce_faq"]),
+                "chfgnn_proj": _method(chf["acc_proj"], chf["nce_proj"]),
+                "chfgnn_faq":  _method(chf["acc_faq"], chf["nce_faq"]),
+            },
         })
         # Free the per-cell data/models before the next noise level (avoids OOM).
         del raw, chain, m0, res, fgnn, chf, base
@@ -147,8 +162,10 @@ def run_real(args, out_path):
         base = _baselines(raw.data)                                   # FAQ(D_cx), Max
         rec = {"table": "realworld-noisy", "cell": c["cell"], "seed": args.seed,
                "num_examples": len(raw.data),
-               "faq_dcx": [round(base["acc_dcx"], 4), round(base["nce_dcx"], 1)],
-               "max_nce": round(base["nce_max"], 1)}
+               "methods": {
+                   "faq_dcx": _method(base["acc_dcx"], base["nce_dcx"]),
+                   "max": {"nce": _arr(base["nce_max"], 1)},
+               }}
         for label, rel in [("chfgnn", c["release"]), ("chfgnn_er4", ER4_RELEASE)]:
             pm = download_release(rel, args.checkpoint_dir)
             cfgm = json.loads(json.dumps(OmegaConf.to_container(cfg)))
@@ -157,7 +174,7 @@ def run_real(args, out_path):
             res = chain.loop(OmegaConf.create(cfgm), args.data_dir, **loop_kw)
             ev = all_qap_chain(siamese_loader(res.best_data, batch_size=1, shuffle=False),
                                res.best_model, res.best_model.device)
-            rec[label] = [round(float(np.mean(ev.acc)), 4), round(float(np.mean(ev.qap)), 1)]
+            rec["methods"][label] = _method(ev.acc, ev.qap)
             # Free this model's tensors before the next one (n=1174 euroroad OOM'd
             # at 96G because the two models stacked up).
             del chain, res, ev

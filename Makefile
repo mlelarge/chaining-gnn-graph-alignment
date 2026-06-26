@@ -18,7 +18,7 @@ OUT          ?= repro_results.jsonl
 .PHONY: help env data verify \
         synthetic synthetic-sparse synthetic-dense synthetic-regular \
         realworld ca-netscience euroroad yeast25lc multimagna \
-        train-sparse reproduce tables clean
+        train-sparse reproduce tables samples clean
 
 help:
 	@echo "Targets:"
@@ -99,10 +99,15 @@ train-sparse:
 reproduce:
 	$(PYTHON) -m repro.reproduce_results --all --seed $(SEED) --num-examples $(NUM_EXAMPLES) --out $(OUT) --data-dir $(DATA)
 
-# Render a reproduction JSONL into the README's markdown tables.
-# Defaults to the committed run; pass a file with e.g. `make tables OUT=repro_results.jsonl`.
+# Render a reproduction JSONL into the README's markdown tables (add CI=--ci for
+# 95% confidence intervals, which needs a per-sample run).
 tables:
-	$(PYTHON) repro/format_tables.py repro/results/repro_seed0.jsonl
+	$(PYTHON) repro/format_tables.py repro/results/repro_seed0.jsonl $(CI)
+
+# Flatten the per-sample outputs to a tidy CSV (one row per cell/method/sample)
+# for paired cross-method analysis. Needs a per-sample run.
+samples:
+	$(PYTHON) repro/samples_to_csv.py repro/results/repro_seed0.jsonl -o repro/results/samples.csv
 
 clean:
 	rm -rf $(DATA) ./checkpoints ./outputs
