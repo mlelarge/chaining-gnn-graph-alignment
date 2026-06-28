@@ -18,7 +18,7 @@ OUT          ?= repro_results.jsonl
 .PHONY: help env data verify \
         synthetic synthetic-sparse synthetic-dense synthetic-regular \
         realworld ca-netscience euroroad yeast25lc multimagna \
-        train-sparse reproduce tables samples clean
+        train-sparse reproduce tables samples overlap clean
 
 help:
 	@echo "Targets:"
@@ -108,6 +108,10 @@ tables:
 # for paired cross-method analysis. Needs a per-sample run.
 samples:
 	$(PYTHON) repro/samples_to_csv.py repro/results/repro_seed0.jsonl -o repro/results/samples.csv
+
+# Per-sample failure overlap of two methods (default ChFGNN-FAQ vs FAQ(D_cx)).
+overlap:
+	$(PYTHON) repro/failure_overlap.py repro/results/repro_seed0.jsonl
 
 clean:
 	rm -rf $(DATA) ./checkpoints ./outputs
