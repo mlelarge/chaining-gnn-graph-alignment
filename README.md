@@ -153,12 +153,12 @@ variant. Regenerate the table with `make reproduce`; re-run the paper's settings
 
 | p | 0 | 0.05 | 0.1 | 0.15 | 0.2 | 0.25 | 0.3 | 0.35 |
 |---|---|---|---|---|---|---|---|---|
-| Proj(D_cx) | 0.98/994 | 0.98/944 | 0.91/849 | 0.58/482 | 0.22/195 | 0.088/132 | 0.040/117 | 0.021/117 |
+| Proj(D_cx) | 0.98/994 | 0.98/944 | 0.91/849 | 0.58/482 | 0.22/195 | 0.088/131 | 0.040/117 | 0.020/117 |
 | FAQ(D_cx) | 0.98/994 | 0.97/945 | 0.97/895 | 0.94/841 | 0.64/683 | 0.12/499 | 0.037/484 | 0.015/481 |
 | FGNN Proj | 1.00/994 | 0.88/792 | 0.69/512 | 0.52/314 | 0.38/196 | 0.29/135 | 0.22/95 | 0.16/72 |
 | FGNN FAQ | 0.98/994 | 0.98/945 | 0.97/895 | 0.95/843 | 0.92/790 | 0.85/732 | 0.58/620 | 0.25/516 |
 | ChFGNN Proj | 0.98/994 | 0.98/945 | 0.97/894 | 0.95/840 | 0.91/783 | 0.85/722 | 0.40/451 | 0.035/261 |
-| ChFGNN FAQ | 0.98/994 | 0.98/945 | 0.97/895 | 0.95/844 | 0.93/792 | 0.88/744 | 0.44/608 | 0.033/520 |
+| ChFGNN FAQ | 0.98/994 | 0.98/945 | 0.97/895 | 0.95/843 | 0.93/792 | 0.88/744 | 0.44/608 | 0.033/520 |
 
 **Dense Erdős–Rényi, average degree 80** (nce_max ≈ 20,000):
 
@@ -191,6 +191,27 @@ variant. Regenerate the table with `make reproduce`; re-run the paper's settings
 >    `FGNN FAQ` row is bimodal and sample-sensitive — with the reduced sample it can sit above `ChFGNN` at a
 >    cell. `ChFGNN` and `FAQ(D_cx)` reproduce stably across the sweep.
 
+### Per-sample analysis (uncertainty & failure overlap)
+
+The reproduction stores every method's **per-pair** `acc`/`nce` (not just the mean) in
+[`repro/results/repro_seed0.jsonl`](repro/results/repro_seed0.jsonl), so the averages above carry
+uncertainty and admit paired, instance-level comparison. `make tables CI=--ci` renders the full
+`mean ± 95% CI` tables; the CIs are negligible everywhere except the **FAQ phase transition**, where they
+are large and expose the bimodality the mean hides (e.g. `sparse@0.3` ChFGNN-FAQ `0.44 ± 0.13`).
+
+Because sample index *i* is the **same graph pair** across methods, `make overlap`
+([`repro/failure_overlap.py`](repro/failure_overlap.py)) compares them pair-by-pair:
+
+- **ChFGNN-FAQ solves a strict superset of FAQ(D_cx)'s pairs.** In *every* cell it never fails a pair the
+  convex baseline solves, and at the transition it solves many the baseline cannot (e.g. +30 of 30 at
+  `sparse@0.25`, +20 of 30 at `regular@0.1`); the remaining hard pairs are common to both. This is a
+  stronger, instance-level version of the mean curves.
+- Against its own single-network ablation it is **not** dominant: `FGNN-FAQ` solves 27 transition pairs that
+  `ChFGNN-FAQ` misses — the per-sample face of the phase-transition variance noted above.
+
+A tidy long CSV (one row per cell/method/sample) is at
+[`repro/results/samples.csv`](repro/results/samples.csv) (`make samples`) for further analysis.
+
 ## Results — real-world graphs
 
 `acc / nce` (acc as %). `FAQ(D_cx)`, `ChFGNN-ER4`, `ChFGNN` and `Max nce` are **reproduced** with
@@ -204,10 +225,10 @@ from the paper. Reproduce with `make realworld`.
 | Method | yeast25LC 5% | yeast25LC 10% | ca-netscience 10% | ca-netscience 20% | inf-euroroad 10% | inf-euroroad 20% |
 |---|---|---|---|---|---|---|
 | FUGAL | 53.1/7480 | 44.6/7035 | 60.3/794 | 37.7/629 | 18.3/818 | 2.9/714 |
-| FAQ(D_cx) | 65.0/7873 | 57.0/7434 | 63.8/817 | 45.2/685 | 57.4/1174 | 15.5/972 |
-| ChFGNN-ER4 | 48.3/7669 | 44.5/7278 | 63.5/814 | 46.0/690 | 39.7/1103 | 13.5/980 |
+| FAQ(D_cx) | 65.0/7873 | 57.0/7435 | 63.8/817 | 45.2/685 | 57.4/1174 | 15.5/972 |
+| ChFGNN-ER4 | 48.3/7669 | 44.5/7279 | 63.5/814 | 46.0/690 | 39.7/1103 | 13.5/980 |
 | ChFGNN | 60.3/7848 | 52.9/7416 | 67.2/821 | 59.3/725 | 59.7/1197 | 18.0/993 |
-| Max nce | – /7918 | – /7510 | – /824 | – /733 | – /1269 | – /1142 |
+| Max nce | – /7918 | – /7511 | – /823 | – /733 | – /1269 | – /1142 |
 
 **MultiMAGNA yeast PPI** (edge-addition low-confidence variants; tab:multimagna-full). "training" =
 the variant used to train the dataset-specific ChFGNN (not a test cell):
