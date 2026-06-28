@@ -18,7 +18,7 @@ OUT          ?= repro_results.jsonl
 .PHONY: help env data verify \
         synthetic synthetic-sparse synthetic-dense synthetic-regular \
         realworld ca-netscience euroroad yeast25lc multimagna \
-        train-sparse reproduce tables samples overlap clean
+        train-sparse reproduce tables samples overlap plot clean
 
 help:
 	@echo "Targets:"
@@ -112,6 +112,10 @@ samples:
 # Per-sample failure overlap of two methods (default ChFGNN-FAQ vs FAQ(D_cx)).
 overlap:
 	$(PYTHON) repro/failure_overlap.py repro/results/repro_seed0.jsonl
+
+# Per-sample analysis figure (needs the viz extra: `uv sync --extra viz`).
+plot:
+	$(PYTHON) repro/plot_samples.py repro/results/repro_seed0.jsonl
 
 clean:
 	rm -rf $(DATA) ./checkpoints ./outputs

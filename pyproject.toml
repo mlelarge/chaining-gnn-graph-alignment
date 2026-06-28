@@ -22,6 +22,11 @@ dependencies = [
     "torch-geometric>=2.5.0",
 ]
 
+[project.optional-dependencies]
+viz = [
+    "matplotlib>=3.11.0",
+]
+
 [tool.setuptools.packages.find]
 include = ["models*", "loaders*", "toolbox*"]
 

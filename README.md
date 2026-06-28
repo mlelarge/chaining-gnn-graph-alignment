@@ -199,6 +199,10 @@ uncertainty and admit paired, instance-level comparison. `make tables CI=--ci` r
 `mean ± 95% CI` tables; the CIs are negligible everywhere except the **FAQ phase transition**, where they
 are large and expose the bimodality the mean hides (e.g. `sparse@0.3` ChFGNN-FAQ `0.44 ± 0.13`).
 
+![Per-sample analysis](repro/results/per_sample_analysis.png)
+
+*(a) Each decoder's per-pair accuracy on sparse ER: the transition is **bimodal** — pairs are either solved (≈1) or not (≈0) — which the mean averages over. (b) ChFGNN-FAQ vs FAQ(D_cx) on every synthetic pair: the **empty lower-right** is the dominance (no pair the baseline solves that ChFGNN misses), and the top-left cloud is the pairs ChFGNN rescues. Regenerate with `make plot` (needs `uv sync --extra viz`).*
+
 Because sample index *i* is the **same graph pair** across methods, `make overlap`
 ([`repro/failure_overlap.py`](repro/failure_overlap.py)) compares them pair-by-pair:
 
