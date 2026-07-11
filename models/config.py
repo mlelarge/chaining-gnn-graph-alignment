@@ -8,14 +8,18 @@ from torch.utils.data import DataLoader
 import numpy as np
 
 
-class TrainMode(Enum):
-    LABELED   = "labeled"    # CrossEntropyLoss, monitors val_loss
-    UNLABELED = "unlabeled"  # Sinkhorn loss, monitors train_loss
-
-
 class SiameseMode(Enum):
-    LABELED   = "labeled"
-    UNLABELED = "unlabeled"
+    """Selects model class, loss function, and LR-scheduler monitor."""
+    LABELED   = "labeled"    # CrossEntropyLoss, monitors val_loss
+    UNLABELED = "unlabeled"  # Sinkhorn trace loss (maximize overlap)
+
+    @property
+    def is_unlabeled(self) -> bool:
+        return self != SiameseMode.LABELED
+
+
+# Backward-compatible alias
+TrainMode = SiameseMode
 
 
 class CollectionFlags(Flag):
@@ -53,7 +57,7 @@ class TrainingConfig:
     log_every_n_steps: int = 10
     val_loader: Optional[DataLoader] = None
     use_wandb: bool = False
-    mode: TrainMode = TrainMode.LABELED
+    mode: SiameseMode = SiameseMode.LABELED
 
 
 @dataclass

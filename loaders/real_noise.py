@@ -42,14 +42,14 @@ def get_adj(file):
     return adj_matrix
 
 
-def make_noisy(A, noise_level):
+def make_noisy(A, noise_level, rng=None):
     """Apply Erdős-Rényi noise to adjacency matrix A."""
     W = torch.as_tensor(A, dtype=torch.float)
     edge_density = W.sum().item() / (len(W) ** 2)
-    return noise_erdos_renyi(None, W, noise_level, edge_density)
+    return noise_erdos_renyi(None, W, noise_level, edge_density, rng=rng)
 
 
-def generate_pairs(A, num_examples, noise_level):
+def generate_pairs(A, num_examples, noise_level, rng=None):
     """Generate num_examples noisy graph pairs from adjacency matrix A."""
     pairs = []
     for _ in range(num_examples):
@@ -57,15 +57,15 @@ def generate_pairs(A, num_examples, noise_level):
             torch.as_tensor(A, dtype=torch.float)
         )
         B_noisy = adjacency_matrix_to_tensor_representation(
-            make_noisy(A, noise_level)
+            make_noisy(A, noise_level, rng=rng)
         )
         pairs.append((B_clean, B_noisy))
     return pairs
 
 
-def pairs_to_parquet(pairs, path):
+def pairs_to_parquet(pairs, path, rng=None):
     """Apply random permutations and save as parquet."""
-    data = all_perm(chunked(iter(pairs), 1), label=True)
+    data = all_perm(chunked(iter(pairs), 1), rng=rng)
     structured_data = []
     for item in data:
         structured_data.append(

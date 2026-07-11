@@ -2,7 +2,7 @@ type: real
 data_subdir: MultiMagna
 no_seed: true
 train:
-  name: yeast0_25_noise005
+  name: yeast0_25_noise005_train
   num_examples: 6
 val:
   name: yeast0_25_noise005_test

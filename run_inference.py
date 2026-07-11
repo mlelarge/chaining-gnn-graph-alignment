@@ -79,7 +79,7 @@ def download_release(tag: str, checkpoint_dir: str) -> str:
 
 
 def build_dataset_config(
-    config: dict, noise: float | None, num_examples: int
+    config: dict, noise: float | None, num_examples: int, seed: int | None = None
 ) -> OmegaConf:
     """Build a minimal OmegaConf dataset config from the saved config.json."""
     ds = config["dataset"]
@@ -91,6 +91,7 @@ def build_dataset_config(
             "noise_model": ds["noise_model"],
             "edge_density": ds["edge_density"],
             "noise": noise if noise is not None else ds["noise"],
+            "seed": seed,
             "test": {"num_examples": num_examples},
         }
     )
@@ -140,7 +141,19 @@ def main():
         default="./data",
         help="Directory to cache generated datasets (default: ./data)",
     )
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=None,
+        help="Seed the synthetic graph generation for reproducibility "
+        "(default: None = the paper's unseeded behavior). Use a fresh --data_dir when changing it.",
+    )
     args = parser.parse_args()
+
+    if args.seed is not None:
+        from toolbox.utils import seed_everything
+
+        seed_everything(args.seed)
 
     # 1. Download models
     print(f"Fetching release {args.release} ...")
@@ -149,7 +162,7 @@ def main():
     # 2. Build dataset config from the release's config.json
     with open(os.path.join(path_models, "config.json")) as f:
         config = json.load(f)
-    cfg_data = build_dataset_config(config, args.noise, args.num_examples)
+    cfg_data = build_dataset_config(config, args.noise, args.num_examples, args.seed)
     noise_used = cfg_data.noise
     print(
         f"Dataset: {cfg_data.generative_model}, n={cfg_data.n_vertices}, "

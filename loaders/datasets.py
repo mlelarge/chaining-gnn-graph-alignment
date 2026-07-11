@@ -158,6 +158,9 @@ class GAP_Generator(Base_Generator):
         num_examples = cfg_data[name].num_examples
         self.n_vertices = cfg_data.n_vertices
         subfolder_name = f"GAP_{self.generative_model}_{self.noise_model}_{num_examples}_{self.n_vertices}_{self.noise}_{self.edge_density}"
+        # Seed-aware cache: distinct seeds must not collide on the same cached dataset.
+        if seed is not None:
+            subfolder_name += f"_seed{seed}"
         path_dataset = os.path.join(path_dataset, subfolder_name)
         super().__init__(name, path_dataset, num_examples, no_seed, saving, label, seed=seed)
         self.data = []

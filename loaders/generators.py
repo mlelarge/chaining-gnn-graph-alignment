@@ -36,7 +36,10 @@ def generates(name):
 @generates("ErdosRenyi")
 def generate_erdos_renyi_netx(p, N, rng: Optional[np.random.Generator] = None):
     """Generate random Erdos Renyi graph"""
-    g = networkx.erdos_renyi_graph(N, p)
+    # Derive an int seed from rng so networkx's draw is reproducible when a
+    # Generator is supplied; rng=None keeps networkx's global (unseeded) behavior.
+    seed = int(rng.integers(2**31 - 1)) if rng is not None else None
+    g = networkx.erdos_renyi_graph(N, p, seed=seed)
     W = networkx.adjacency_matrix(g).todense()
     return g, torch.as_tensor(W, dtype=torch.float), p
 
@@ -58,7 +61,8 @@ def generate_regular_graph_netx(p, N, rng: Optional[np.random.Generator] = None)
     # Make sure N * d is even
     if N * d % 2 == 1:
         d += 1
-    g = networkx.random_regular_graph(d, N)
+    seed = int(rng.integers(2**31 - 1)) if rng is not None else None
+    g = networkx.random_regular_graph(d, N, seed=seed)
     W = networkx.adjacency_matrix(g).todense()
     return g, torch.as_tensor(W, dtype=torch.float), p
 

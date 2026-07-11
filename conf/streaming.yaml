@@ -1,4 +1,4 @@
-root_dir: /scratch/lelarge
+root_dir: null
 saving: False
 path_logs:
 
@@ -8,4 +8,4 @@ defaults:
   - model: fgnn
   - training: stream
   - pipeline: chain_noseed
-  - hydra/run: mac
+  - hydra/run: default

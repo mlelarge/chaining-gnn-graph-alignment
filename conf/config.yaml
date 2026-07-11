@@ -1,4 +1,6 @@
-root_dir: /scratch/lelarge/
+# null -> resolved to ~/experiments-gnn-gap (see commander.py). Override on the CLI
+# with `root_dir=/path/to/data` to point at an existing data/checkpoint tree.
+root_dir: null
 
 defaults:
   - _self_
@@ -6,4 +8,4 @@ defaults:
   - model: fgnn
   - training: gpu
   - pipeline: chain_noseed
-  - hydra/run: cluster
+  - hydra/run: default

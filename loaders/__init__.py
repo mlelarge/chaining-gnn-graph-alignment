@@ -93,21 +93,26 @@ def get_data(cfg_data, path_dataset, saving=True, split="train_val"):
 
 
 def _get_synthetic(cfg_data, path_dataset, saving, split):
+    # Optional cfg_data.seed makes synthetic graph generation reproducible. Offset
+    # per split so train/val/test get distinct (but deterministic) graphs.
+    base_seed = getattr(cfg_data, "seed", None)
+    def _seed(offset):
+        return None if base_seed is None else int(base_seed) + offset
     if split == "train_val":
-        gene_train = GAP_Generator("train", cfg_data, path_dataset, saving=saving)
+        gene_train = GAP_Generator("train", cfg_data, path_dataset, saving=saving, seed=_seed(0))
         gene_train.load_dataset()
-        gene_val = GAP_Generator("val", cfg_data, path_dataset, saving=saving)
+        gene_val = GAP_Generator("val", cfg_data, path_dataset, saving=saving, seed=_seed(1))
         gene_val.load_dataset()
         return gene_train, gene_val
     elif split == "test":
         label = getattr(cfg_data, "label", True)
         gene_test = GAP_Generator(
-            "test", cfg_data, path_dataset, saving=saving, label=label
+            "test", cfg_data, path_dataset, saving=saving, label=label, seed=_seed(2)
         )
         gene_test.load_dataset()
         return gene_test
     elif split == "train_only":
-        gene_train = GAP_Generator("train", cfg_data, path_dataset, saving=saving)
+        gene_train = GAP_Generator("train", cfg_data, path_dataset, saving=saving, seed=_seed(0))
         gene_train.load_dataset()
         return gene_train
 

@@ -12,12 +12,11 @@ import time
 from models import (
     get_model,
     get_siamese,
-    get_siamese_nl,
     get_siamese_name,
     train_siamese,
 )
 from models.pl_model import Siamese_Node
-from models.config import LoopConfig, CollectionFlags
+from models.config import SiameseMode, OptimizationConfig
 from loaders.data_generator import GAP_Generator
 from loaders import siamese_loader, get_data
 import loaders.data_generator as dg
@@ -28,6 +27,25 @@ from toolbox.metrics import all_qap_chain
 DEFAULT_PATIENCE = 10
 DEFAULT_EPS = 0.001
 DEFAULT_SIZE_SEED = 20
+
+def _negate_B_channel(dataset):
+    """Negate channel 0 (adjacency matrix) of graph B for each sample in-place.
+
+    This converts a QAP minimization problem into a GAP maximization problem,
+    allowing the same loss and inference code to handle both.
+
+    Works with both plain lists and Base_Generator/GAP_Generator objects
+    (which store samples in a .data attribute).
+    """
+    samples = dataset.data if hasattr(dataset, "data") else dataset
+    for i, sample in enumerate(samples):
+        g2 = sample[1].clone()
+        g2[0, :, :] = -g2[0, :, :]
+        if len(sample) == 3:
+            samples[i] = (sample[0], g2, sample[2])
+        else:
+            samples[i] = (sample[0], g2)
+    return dataset
 
 
 @dataclass
@@ -40,6 +58,20 @@ class LoopResult:
     all_nce_data: Optional[np.ndarray] = None
     all_faq_data: Optional[np.ndarray] = None
     all_times: Optional[np.ndarray] = None
+    best_faq_perm: Optional[np.ndarray] = None
+
+
+def _make_opt_cfg(cfg_training, lr_override: float | None = None) -> OptimizationConfig:
+    """Build an OptimizationConfig from a Hydra training config."""
+    lr = lr_override if lr_override is not None else cfg_training.lr
+    return OptimizationConfig(
+        lr=lr,
+        scheduler_decay=cfg_training.scheduler_decay,
+        scheduler_step=cfg_training.scheduler_step,
+        # Halve lr_stop so the scheduler's min_lr sits below the EarlyStopping
+        # threshold, ensuring the LR monitor triggers the stop first.
+        lr_min=cfg_training.lr_stop / 2,
+    )
 
 
 class Pipeline(ABC):
@@ -83,6 +115,9 @@ class Chaining(Pipeline):
         num_models: Number of models to train. If None, counts existing checkpoints.
         use_labels: If True, use labeled training with validation set (Siamese_Node).
             If False, use no-label Sinkhorn-based training (Siamese_Node_NL).
+        negate_B: If True, negate channel 0 of graph B after loading data.
+            This converts QAP minimization into GAP maximization so the same
+            loss and inference code handles both problems.
     """
 
     def __init__(
@@ -90,9 +125,17 @@ class Chaining(Pipeline):
         path_models: str,
         num_models: int | None = None,
         use_labels: bool = True,
+        negate_B: bool = False,
     ):
         super().__init__(path_models, num_models)
         self.use_labels = use_labels
+        self.negate_B = negate_B
+
+    @property
+    def _siamese_mode(self) -> SiameseMode:
+        if self.use_labels:
+            return SiameseMode.LABELED
+        return SiameseMode.UNLABELED
 
     def build_ind(
         self,
@@ -179,43 +222,37 @@ class Chaining(Pipeline):
         config_dict = OmegaConf.to_container(self.cfg, resolve=True)
         save_json(os.path.join(self.path_models, "config.json"), config_dict)
 
-        create_siamese = get_siamese if self.use_labels else get_siamese_nl
+        mode = self._siamese_mode
+        opt_cfg = _make_opt_cfg(self.cfg.training)
 
-        siamese = create_siamese(node_embedder)
-        siamese.set_training_mode(
-            lr=self.cfg.training.lr,
-            scheduler_decay=self.cfg.training.scheduler_decay,
-            scheduler_step=self.cfg.training.scheduler_step,
-            lr_stop=self.cfg.training.lr_stop,
+        siamese = get_siamese(node_embedder, opt_cfg=opt_cfg, mode=mode)
+
+        data_train, data_val = get_data(
+            self.cfg.dataset, self.path_dataset, self.saving, split="train_val"
         )
-
+        if self.negate_B:
+            _negate_B_channel(data_train)
+            if data_val is not None:
+                _negate_B_channel(data_val)
         if self.use_labels:
-            data_train, data_val = get_data(
-                self.cfg.dataset, self.path_dataset, self.saving, split="train_val"
-            )
             new_train, new_val = self.train_data(
                 data_train, siamese, L=0, data_val=data_val
             )
         else:
-            data_train, data_val = get_data(
-                self.cfg.dataset, self.path_dataset, self.saving, split="train_val"
-            )
-            new_train, new_val = self.train_data(
-                data_train, siamese, L=0, data_val=data_val
-            )
+            # NL: use all data for training (no validation monitoring)
+            new_train = self.train_data(data_train, siamese, L=0)
+            new_val = None
 
-        siamese = create_siamese(node_embedder)
         lr_subsequent = getattr(self.cfg.training, "lr_subsequent", self.cfg.training.lr)
-        siamese.set_training_mode(
-            lr=lr_subsequent,
-            scheduler_decay=self.cfg.training.scheduler_decay,
-            scheduler_step=self.cfg.training.scheduler_step,
-            lr_stop=self.cfg.training.lr_stop,
-        )
+        opt_cfg_sub = _make_opt_cfg(self.cfg.training, lr_override=lr_subsequent)
+        siamese = get_siamese(node_embedder, opt_cfg=opt_cfg_sub, mode=mode)
         for i in range(1, self.num_models):
-            new_train, new_val = self.train_data(
-                new_train, siamese, L=i, data_val=new_val
-            )
+            if self.use_labels:
+                new_train, new_val = self.train_data(
+                    new_train, siamese, L=i, data_val=new_val
+                )
+            else:
+                new_train = self.train_data(new_train, siamese, L=i)
 
     def _check_improvement(self, delta, current_max_nce, eps, stop, patience):
         """Check early stopping criterion with safe division."""
@@ -231,6 +268,14 @@ class Chaining(Pipeline):
             else:
                 return stop - 1
 
+    def _refresh_checkpoints(self):
+        """Refresh checkpoint list if not yet populated (e.g. after training)."""
+        if not self.list_models:
+            self.list_models = sorted(
+                f for f in os.listdir(self.path_models) if f.endswith(".ckpt")
+            )
+            self.num_models = len(self.list_models)
+
     def loop(
         self,
         cfg_data: DictConfig,
@@ -244,9 +289,12 @@ class Chaining(Pipeline):
         ind: int | None = None,
         compute_faq: bool = False,
         timing: bool = False,
+        use_faq_warmstart: bool = False,
     ) -> LoopResult:
         config = load_json(os.path.join(self.path_models, "config.json"))
         data_test = get_data(cfg_data, path_dataset, split="test")
+        if self.negate_B:
+            _negate_B_channel(data_test)
         if ind is None:
             if batch_size:
                 self.batch_size = batch_size
@@ -260,12 +308,7 @@ class Chaining(Pipeline):
             data_test, batch_size=self.batch_size, shuffle=False
         )
 
-        # Refresh checkpoint list if not yet populated (e.g. after training)
-        if not self.list_models:
-            self.list_models = sorted(
-                f for f in os.listdir(self.path_models) if f.endswith(".ckpt")
-            )
-            self.num_models = len(self.list_models)
+        self._refresh_checkpoints()
 
         if L is not None:
             if L > self.num_models:
@@ -289,9 +332,25 @@ class Chaining(Pipeline):
         if timing:
             start_time = time.time()
             all_times = []
+
+        _load_mode = self._siamese_mode
+
+        if use_faq_warmstart:
+            best_faq_perm = self._faq_warmstart_loop(
+                data_test, config, L, patience, eps, _load_mode,
+            )
+            return LoopResult(
+                best_model=None,
+                best_data=data_test,
+                best_nloop=0,
+                all_qap=None,
+                best_faq_perm=best_faq_perm,
+            )
+
         for loop_idx, model_name in enumerate(self.list_models[:L]):
             siamese = get_siamese_name(
-                os.path.join(self.path_models, model_name), config["model"]
+                os.path.join(self.path_models, model_name), config["model"],
+                mode=_load_mode,
             )
             new_data_test, current_ind, all_nce, all_faq = self.build_ind(
                 data_test,
@@ -392,6 +451,133 @@ class Chaining(Pipeline):
             all_times=np.array(all_times) if timing else None,
         )
 
+    @staticmethod
+    def _update_positional_encoding(data, perm):
+        """Update positional encoding so matched nodes share the same rank.
+
+        Sets graph1 node i to rank i/n and graph2 node perm[i] to rank i/n,
+        encoding the current best matching into the positional channel.
+
+        Args:
+            data: Single sample tuple (tensor1, tensor2[, label]).
+            perm: (n,) permutation array — graph1 node i matches graph2 node perm[i].
+
+        Returns:
+            Updated sample tuple with new positional encoding.
+        """
+        from loaders.representations import adjacency_matrix_to_tensor_representation_ind
+
+        ind1 = np.arange(len(perm))  # identity: node i gets rank i/n
+        ind2 = perm                   # node perm[i] gets rank i/n
+        new_g1 = adjacency_matrix_to_tensor_representation_ind(data[0], ind1)
+        new_g2 = adjacency_matrix_to_tensor_representation_ind(data[1], ind2)
+        if len(data) == 3:
+            return (new_g1, new_g2, data[2])
+        return (new_g1, new_g2)
+
+    def _faq_warmstart_loop(
+        self,
+        data_test,
+        config: dict,
+        L: int,
+        patience: int,
+        eps: float,
+        load_mode: SiameseMode,
+    ) -> Optional[np.ndarray]:
+        """FAQ warm-start chaining loop.
+
+        After each model iteration, runs FAQ refinement on the GNN scores and
+        encodes the FAQ-refined permutation into the positional channel so the
+        next model sees strong matching hints.
+
+        Note: when negate_B is True, data_test contains -B in channel 0 of
+        graph 2. We extract the original A and B (un-negated) for the FAQ
+        solver, which needs the true matrices.
+
+        Returns:
+            Best FAQ-refined permutation, or None if no improvement found.
+        """
+        from toolbox.utils import perm2mat
+        from scipy.optimize import linear_sum_assignment, quadratic_assignment
+
+        device = self.device
+        # Extract original A and B from the single test sample.
+        # Channel 0 of graph 2 may be negated (if negate_B), so undo that.
+        sample = data_test[0]
+        A = sample[0][0].numpy()
+        B_stored = sample[1][0].numpy()
+        B = -B_stored if self.negate_B else B_stored
+        n = A.shape[0]
+
+        def qap_obj(perm):
+            return (A * B[perm, :][:, perm]).sum()
+
+        ckpts = self.list_models[:L]
+
+        # FAQ from scratch (computed once for reference)
+        res_scratch = quadratic_assignment(A, B, method="faq")
+        faq_scratch_obj = qap_obj(res_scratch["col_ind"])
+
+        best_faq_warm = np.inf
+        best_perm = None
+        stop = patience
+
+        print(f"\nFAQ warm-start chaining (n={n}):")
+        print(f"  {'Iter':<6} {'LAP':>14} {'FAQ warm':>14} {'FAQ scratch':>14} {'best?':>6}")
+
+        data_iter = data_test
+        for i, ckpt in enumerate(ckpts):
+            siamese = get_siamese_name(
+                os.path.join(self.path_models, ckpt), config["model"], mode=load_mode
+            )
+            siamese = siamese.to(device)
+            siamese.eval()
+
+            loader_i = siamese_loader(data_iter, batch_size=1, shuffle=False)
+            with torch.no_grad():
+                for batch in loader_i:
+                    data1, data2 = batch[0], batch[1]
+                    data1["input"] = data1["input"].to(device)
+                    data2["input"] = data2["input"].to(device)
+                    rawscores = siamese(data1, data2)
+                    weight = torch.log_softmax(rawscores, -1)[0].cpu().numpy()
+
+            _, col_ind_i = linear_sum_assignment(-weight)
+
+            Pp = perm2mat(col_ind_i)
+            res_warm = quadratic_assignment(A, B, method="faq", options={"P0": Pp})
+            faq_perm = res_warm["col_ind"]
+            faq_warm_obj = qap_obj(faq_perm)
+
+            delta = best_faq_warm - faq_warm_obj  # positive = improvement
+            is_best = ""
+            if delta > 0:
+                best_faq_warm = faq_warm_obj
+                best_perm = faq_perm.copy()
+                is_best = "*"
+
+            if best_faq_warm < np.inf and best_faq_warm > eps:
+                improved = (delta / best_faq_warm) > eps
+            else:
+                improved = delta > eps
+            stop = patience if improved else stop - 1
+
+            print(
+                f"  {i:<6} {qap_obj(col_ind_i):>14.0f}"
+                f" {faq_warm_obj:>14.0f}"
+                f" {faq_scratch_obj:>14.0f}"
+                f" {is_best:>6}"
+            )
+
+            if stop == 0:
+                print(f"  Early stopping at iteration {i}.")
+                break
+
+            # Encode FAQ-refined permutation into positional encoding
+            data_iter = [self._update_positional_encoding(data_iter[0], faq_perm)]
+
+        return best_perm
+
     def loop_siamese(
         self,
         dataset: list,
@@ -450,8 +636,8 @@ class Chaining(Pipeline):
 
 
 # Backwards-compatible alias for the no-label variant.
-Chaining_NL = lambda path_models, num_models=None: Chaining(
-    path_models, num_models, use_labels=False
+Chaining_NL = lambda path_models, num_models=None, negate_B=False: Chaining(
+    path_models, num_models, use_labels=False, negate_B=negate_B
 )
 
 
@@ -492,26 +678,15 @@ class Streaming(Pipeline):
         config_dict = OmegaConf.to_container(self.cfg, resolve=True)
         save_json(os.path.join(self.path_models, "config.json"), config_dict)
 
-        siamese = get_siamese(node_embedder)
-        siamese.set_training_mode(
-            lr=self.cfg.training.lr,
-            scheduler_decay=self.cfg.training.scheduler_decay,
-            scheduler_step=self.cfg.training.scheduler_step,
-            lr_stop=self.cfg.training.lr_stop,
-        )
+        opt_cfg = _make_opt_cfg(self.cfg.training)
+        siamese = get_siamese(node_embedder, opt_cfg=opt_cfg)
 
         data_train, data_val = get_data(
             self.cfg.dataset, self.path_dataset, self.saving
         )
         self.train_data(data_train, data_val, siamese, L=0)
 
-        siamese = get_siamese(node_embedder)
-        siamese.set_training_mode(
-            lr=self.cfg.training.lr,
-            scheduler_decay=self.cfg.training.scheduler_decay,
-            scheduler_step=self.cfg.training.scheduler_step,
-            lr_stop=self.cfg.training.lr_stop,
-        )
+        siamese = get_siamese(node_embedder, opt_cfg=opt_cfg)
         for i in range(1, self.num_models):
             data_train, data_val = get_data(
                 self.cfg.dataset, self.path_dataset, self.saving

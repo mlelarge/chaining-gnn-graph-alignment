@@ -1,0 +1,3 @@
+# Portable Hydra run directory: relative to the current working directory, so a
+# fresh clone works with no editing. Lands in the gitignored ./outputs/ tree.
+dir: outputs/${now:%Y-%m-%d}/${now:%H-%M-%S}

@@ -1,0 +1,7 @@
+{
+  "type": "node_embedding_node_pos",
+  "block_inside": "block_res_mem",
+  "num_blocks": 1,
+  "in_features": 32,
+  "depth_of_mlp": 1
+}
