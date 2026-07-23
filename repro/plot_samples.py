@@ -11,6 +11,7 @@ Reads a per-sample reproduction JSONL (reproduce_results.py) and writes
       synthetic families, with the y=x line. No point falls below the line:
       ChFGNN-FAQ never loses a pair the convex baseline wins (strict dominance),
       and the off-diagonal top-left cloud is the pairs it rescues.
+  (c) Same paired scatter against the BAPG-GW baseline (toolbox/bapg.py).
 
     python repro/plot_samples.py [results.jsonl] [-o out.png]
 """
@@ -28,8 +29,10 @@ import numpy as np  # noqa: E402
 HERE = os.path.dirname(os.path.abspath(__file__))
 DEFAULT = os.path.join(HERE, "results", "repro_seed0.jsonl")
 
-M_COLOR = {"faq_dcx": "#d62728", "fgnn_faq": "#1f77b4", "chfgnn_faq": "#2ca02c"}
-M_LABEL = {"faq_dcx": "FAQ(D_cx)", "fgnn_faq": "FGNN-FAQ", "chfgnn_faq": "ChFGNN-FAQ"}
+M_COLOR = {"faq_dcx": "#d62728", "fgnn_faq": "#1f77b4", "chfgnn_faq": "#2ca02c",
+           "bapg_proj": "#17becf"}
+M_LABEL = {"faq_dcx": "FAQ(D_cx)", "fgnn_faq": "FGNN-FAQ", "chfgnn_faq": "ChFGNN-FAQ",
+           "bapg_proj": "BAPG-GW"}
 FAM_COLOR = {"sparse": "#2ca02c", "dense": "#9467bd", "regular": "#ff7f0e"}
 
 
@@ -51,15 +54,20 @@ def main():
     cells = load(args.path)
     rng = np.random.default_rng(0)
 
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(13, 5.3))
+    fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(19.5, 5.3))
 
-    # (a) sparse: per-pair accuracy of each decoder vs noise (jittered)
+    # (a) sparse: per-pair accuracy of each decoder vs noise (jittered).
+    # Methods absent from the record (e.g. bapg_proj before the add_bapg
+    # merge) are skipped rather than crashing.
     noises = sorted(n for (fam, n) in cells if fam == "sparse")
-    for mi, m in enumerate(["faq_dcx", "fgnn_faq", "chfgnn_faq"]):
+    methods_a = [m for m in ["faq_dcx", "bapg_proj", "fgnn_faq", "chfgnn_faq"]
+                 if all(m in cells[("sparse", n)] for n in noises)]
+    for mi, m in enumerate(methods_a):
         xs, ys = [], []
         for n in noises:
             acc = cells[("sparse", n)][m]["acc"]
-            xs += [n + (mi - 1) * 0.011 + j for j in rng.normal(0, 0.004, len(acc))]
+            xs += [n + (mi - (len(methods_a) - 1) / 2) * 0.011 + j
+                   for j in rng.normal(0, 0.004, len(acc))]
             ys += list(acc)
         ax1.scatter(xs, ys, s=15, alpha=0.5, color=M_COLOR[m], edgecolors="none", label=M_LABEL[m])
     ax1.set(xlabel="noise $p$", ylabel="per-pair accuracy", ylim=(-0.05, 1.05),
@@ -81,6 +89,23 @@ def main():
     ax2.set_aspect("equal")
     ax2.legend(loc="lower right", fontsize=9, framealpha=0.9)
     ax2.grid(alpha=0.25)
+
+    # (c) paired scatter ChFGNN-FAQ vs BAPG-GW, all synthetic families
+    for (fam, n), m in cells.items():
+        if "bapg_proj" not in m:
+            continue
+        x = np.array(m["bapg_proj"]["acc"]) + rng.normal(0, 0.008, len(m["bapg_proj"]["acc"]))
+        y = np.array(m["chfgnn_faq"]["acc"]) + rng.normal(0, 0.008, len(m["chfgnn_faq"]["acc"]))
+        ax3.scatter(x, y, s=15, alpha=0.45, color=FAM_COLOR[fam], edgecolors="none")
+    ax3.plot([-0.05, 1.05], [-0.05, 1.05], "k--", lw=1.2, label="$y = x$")
+    for fam, c in FAM_COLOR.items():
+        ax3.scatter([], [], color=c, label=fam)
+    ax3.set(xlabel="BAPG-GW per-pair accuracy", ylabel="ChFGNN-FAQ per-pair accuracy",
+            xlim=(-0.05, 1.05), ylim=(-0.05, 1.05),
+            title="(c) Paired — ChFGNN-FAQ vs BAPG-GW:\nnear-dominance (one pair solved that the chain misses)")
+    ax3.set_aspect("equal")
+    ax3.legend(loc="lower right", fontsize=9, framealpha=0.9)
+    ax3.grid(alpha=0.25)
 
     fig.tight_layout()
     fig.savefig(args.out, dpi=130)
