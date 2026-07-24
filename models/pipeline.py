@@ -82,6 +82,10 @@ class Pipeline(ABC):
         # cfg.pipeline.rank_key at training time and from the saved config.json
         # at inference time, so a chain is always run the way it was trained.
         self.rank_key = "raw"
+        # If True, the inter-link feedback uses a RANDOM node order instead of
+        # the score-based ranking (the matching is still transported, only the
+        # confidence ordering is destroyed). Ablation flag; same lifecycle.
+        self.random_order = False
         if num_models:
             self.num_models = num_models
             self.list_models = []
@@ -176,6 +180,7 @@ class Chaining(Pipeline):
             verbose=verbose,
             size_seed=size_seed,
             rank_key=self.rank_key,
+            random_order=self.random_order,
         )
         new_data = dg.make_data_from_ind_label(data, result.indices)
         return (
@@ -222,6 +227,7 @@ class Chaining(Pipeline):
         self.path_dataset = path_dataset
         self.cfg = cfg
         self.rank_key = str(OmegaConf.select(cfg, "pipeline.rank_key", default="raw"))
+        self.random_order = bool(OmegaConf.select(cfg, "pipeline.random_order", default=False))
         self.batch_size = self.cfg.training.batch_size
         self.saving = True
         node_embedder = get_model(self.cfg.model)
@@ -296,10 +302,17 @@ class Chaining(Pipeline):
         compute_faq: bool = False,
         timing: bool = False,
         use_faq_warmstart: bool = False,
+        random_order: bool | None = None,
     ) -> LoopResult:
         config = load_json(os.path.join(self.path_models, "config.json"))
-        # Run the chain with the ranking key it was trained with.
+        # Run the chain the way it was trained (ranking key + order); an explicit
+        # random_order overrides the stored config (for inference-time ablation).
         self.rank_key = config.get("pipeline", {}).get("rank_key", "raw")
+        self.random_order = (
+            config.get("pipeline", {}).get("random_order", False)
+            if random_order is None
+            else random_order
+        )
         data_test = get_data(cfg_data, path_dataset, split="test")
         if self.negate_B:
             _negate_B_channel(data_test)
@@ -681,6 +694,7 @@ class Streaming(Pipeline):
         self.path_dataset = path_dataset
         self.cfg = cfg
         self.rank_key = str(OmegaConf.select(cfg, "pipeline.rank_key", default="raw"))
+        self.random_order = bool(OmegaConf.select(cfg, "pipeline.random_order", default=False))
         self.batch_size = self.cfg.training.batch_size
         self.saving = cfg.saving
         node_embedder = get_model(self.cfg.model)
