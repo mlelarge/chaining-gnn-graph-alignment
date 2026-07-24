@@ -32,12 +32,13 @@ import argparse
 import gc
 import json
 import os
+import time
 
 import numpy as np
 from omegaconf import OmegaConf
 
 from loaders import get_data
-from repro.reproduce_results import SYNTHETIC, _method
+from repro.reproduce_results import SYNTHETIC, _arr, _method
 from toolbox.bapg import evaluate_bapg
 from toolbox.utils import seed_everything
 
@@ -145,16 +146,19 @@ def main():
                 raw = _replay_cell(rec, args.data_dir)
                 if not args.skip_validation and rec["noise"] == 0:
                     _check_fingerprint(rec, raw)
-                acc, nce, fallbacks = [], [], 0
+                acc, nce, secs, fallbacks = [], [], [], 0
                 for g1, g2, pl in _pairs(raw.data):
+                    t0 = time.perf_counter()
                     r = evaluate_bapg(g1, g2, pl)
+                    secs.append(time.perf_counter() - t0)
                     acc.append(r["acc_bapg"])
                     nce.append(r["nce_bapg"])
                     fallbacks += int(r.get("bapg_failed", 0))
                 rec["methods"][METHOD_KEY] = _method(acc, nce)
+                rec["methods"][METHOD_KEY]["time"] = _arr(secs, 2)  # wall s/pair
                 note = f"  [WARNING: {fallbacks} identity-fallback pairs]" if fallbacks else ""
                 print(f"  -> {METHOD_KEY}: mean acc {np.mean(acc):.4f}, "
-                      f"mean nce {np.mean(nce):.1f}{note}")
+                      f"mean nce {np.mean(nce):.1f}, mean {np.mean(secs):.1f} s/pair{note}")
                 del raw
                 gc.collect()
             f.write(json.dumps(rec) + "\n")

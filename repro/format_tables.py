@@ -22,6 +22,7 @@ ERREG_ROWS = [
     ("Proj(D_cx)", "proj_dcx"),
     ("FAQ(D_cx)", "faq_dcx"),
     ("BAPG-GW Proj", "bapg_proj"),
+    ("FGWAlign", "fgwalign"),
     ("FGNN Proj", "fgnn_proj"),
     ("FGNN FAQ", "fgnn_faq"),
     ("ChFGNN Proj", "chfgnn_proj"),

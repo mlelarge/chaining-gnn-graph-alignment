@@ -122,7 +122,7 @@ random draw — the base graph (for synthetic), the edge add/remove noise, and t
 | `v1.1.0-yeast25lc-pn0.05` / `-pn0.1` | ChFGNN, yeast25LC (noise 0.05 / 0.1) |
 | `v1.1.0-multimagna` | ChFGNN, MultiMAGNA yeast |
 
-### Baselines (FAQ, BAPG-GW, FUGAL, SGWL)
+### Baselines (FAQ, BAPG-GW, FGWAlign, FUGAL, SGWL)
 
 `run_baseline.py` reproduces the in-repo FAQ baselines — **FAQ(D_cx)**, **FAQ(J)**, and the
 **Max-nce** ceiling (FAQ seeded from the true permutation). The external baselines are **not**
@@ -141,6 +141,20 @@ decode — a *stronger* extraction than the paper's row-argmax). Its per-sample 
 into the reproduction JSONL by [`repro/add_bapg.py`](repro/add_bapg.py), which replays the seeded
 test pairs exactly (with validation gates) so the comparison is paired per graph pair.
 
+**FGWAlign** (Tang et al., [*Fused Gromov-Wasserstein Alignment for Graph Edit Distance
+Computation and Beyond*](https://www.vldb.org/pvldb/vol18/p3641-tang.pdf), PVLDB 18(11), 2025)
+is evaluated per-sample on the same pairs, but is **not vendored**: the
+[upstream repository](https://github.com/squareRoot3/FGWAlign) carries no license, so
+[`repro/add_fgwalign.py`](repro/add_fgwalign.py) imports it from a clone you provide
+(`--fgwalign-path`; its core function needs only torch/pot/numpy, all already in this
+environment). Settings: the authors' defaults (`patience=15`, `topk=5`, full solver) with
+`sparse=True` — the dense code path overflows float32 at n=500 (NaN plan → crash inside POT's
+EMD; see the driver's docstring), and the sparse path's objective has the same optimum over
+permutations. Its GED objective is equivalent to maximizing `nce` here (unlabeled, equal-size
+graphs: `GED = |E1|+|E2|−2·nce`). Runtime is the trade-off: ~70 s/pair (sparse family),
+~150–210 s/pair (dense), ~85–95 s/pair (regular) on one CPU core, vs ~10/&lt;1/&lt;1 s/pair
+for BAPG-GW.
+
 ## Training from scratch
 
 Training uses [Hydra](https://hydra.cc/) configs in [`conf/`](conf/). By default, data and
@@ -157,10 +171,12 @@ Accuracy / number of common edges (`acc / nce`) as a function of the noise `p`. 
 **reproduced** with `make reproduce` (fixed seed 0; 30 test pairs per cell, 10 for dense) from the run in
 [`repro/results/repro_seed0.jsonl`](repro/results/repro_seed0.jsonl), and reproduce the paper's Table.
 `Proj` and `FAQ` are post-processing decoders; `FGNN` is a single network and `ChFGNN` the chained
-variant. The `BAPG-GW Proj` row is a post-paper addition (see [Baselines](#baselines-faq-bapg-gw-fugal-sgwl)),
-evaluated on the same pairs by `python -m repro.add_bapg --out merged.jsonl`. Regenerate the table with
-`make reproduce`, then merge the BAPG row into the fresh JSONL the same way (the tables render `–` for
-the row until it is merged); re-run the paper's settings with `make synthetic`.
+variant. The `BAPG-GW Proj` and `FGWAlign` rows are post-paper additions (see
+[Baselines](#baselines-faq-bapg-gw-fgwalign-fugal-sgwl)), evaluated on the same pairs by
+`python -m repro.add_bapg --out merged.jsonl` and `python -m repro.add_fgwalign --fgwalign-path
+<clone> --out merged2.jsonl`. Regenerate the table with `make reproduce`, then merge those rows into
+the fresh JSONL the same way (the tables render `–` for them until merged); re-run the paper's
+settings with `make synthetic`.
 
 **Sparse Erdős–Rényi, average degree 4** (nce_max ≈ 1000):
 
@@ -169,6 +185,7 @@ the row until it is merged); re-run the paper's settings with `make synthetic`.
 | Proj(D_cx) | 0.98/994 | 0.98/944 | 0.91/849 | 0.58/482 | 0.22/195 | 0.088/131 | 0.040/117 | 0.020/117 |
 | FAQ(D_cx) | 0.98/994 | 0.97/945 | 0.97/895 | 0.94/841 | 0.64/683 | 0.12/499 | 0.037/484 | 0.015/481 |
 | BAPG-GW Proj | 0.98/994 | 0.89/893 | 0.71/772 | 0.35/624 | 0.13/548 | 0.062/528 | 0.020/520 | 0.009/520 |
+| FGWAlign | 0.98/994 | 0.88/886 | 0.70/767 | 0.34/618 | 0.13/546 | 0.062/528 | 0.021/520 | 0.010/520 |
 | FGNN Proj | 1.00/994 | 0.88/792 | 0.69/512 | 0.52/314 | 0.38/196 | 0.29/135 | 0.22/95 | 0.16/72 |
 | FGNN FAQ | 0.98/994 | 0.98/945 | 0.97/895 | 0.95/843 | 0.92/790 | 0.85/732 | 0.58/620 | 0.25/516 |
 | ChFGNN Proj | 0.98/994 | 0.98/945 | 0.97/894 | 0.95/840 | 0.91/783 | 0.85/722 | 0.40/451 | 0.035/261 |
@@ -181,6 +198,7 @@ the row until it is merged); re-run the paper's settings with `make synthetic`.
 | Proj(D_cx) | 1.00/19906 | 1.00/18904 | 1.00/17882 | 0.67/9827 | 0.17/3975 | 0.049/3664 | 0.024/3646 | 0.012/3604 |
 | FAQ(D_cx) | 1.00/19906 | 1.00/18904 | 1.00/17896 | 1.00/16912 | 1.00/15899 | 0.32/8854 | 0.014/6226 | 0.006/6218 |
 | BAPG-GW Proj | 1.00/19906 | 1.00/18904 | 1.00/17896 | 1.00/16912 | 1.00/15899 | 0.32/8832 | 0.13/7018 | 0.011/6208 |
+| FGWAlign | 1.00/19906 | 1.00/18904 | 1.00/17869 | 1.00/16842 | 1.00/15784 | 0.32/8595 | 0.13/6981 | 0.014/6208 |
 | FGNN Proj | 1.00/19906 | 1.00/18891 | 0.80/12764 | 0.45/6228 | 0.26/4296 | 0.15/3677 | 0.094/3517 | 0.056/3417 |
 | FGNN FAQ | 1.00/19906 | 1.00/18904 | 1.00/17896 | 1.00/16912 | 1.00/15899 | 1.00/14911 | 0.81/12365 | 0.12/6897 |
 | ChFGNN Proj | 1.00/19906 | 1.00/18904 | 0.95/16584 | 0.82/12699 | 0.73/10333 | 0.49/7026 | 0.082/4278 | 0.014/4037 |
@@ -193,6 +211,7 @@ the row until it is merged); re-run the paper's settings with `make synthetic`.
 | Proj(D_cx) | 0.002/51 | 0.002/51 | 0.002/51 | 0.002/50 | 0.002/50 |
 | FAQ(D_cx) | 0.002/623 | 0.002/491 | 0.002/571 | 0.002/646 | 0.002/409 |
 | BAPG-GW Proj | 0.002/51 | 0.002/51 | 0.002/51 | 0.002/50 | 0.002/50 |
+| FGWAlign | 0.003/821 | 0.002/820 | 0.003/821 | 0.002/821 | 0.002/821 |
 | FGNN Proj | 1.00/2500 | 0.40/465 | 0.16/133 | 0.085/82 | 0.068/72 |
 | FGNN FAQ | 1.00/2500 | 0.95/2052 | 0.89/1693 | 0.10/849 | 0.032/834 |
 | ChFGNN Proj | 1.00/2500 | 0.72/1329 | 0.27/518 | 0.005/296 | 0.004/290 |
@@ -204,7 +223,8 @@ the row until it is merged); re-run the paper's settings with `make synthetic`.
 >    near-random alignment; their `nce` is high-variance and only approximate (this *is* the paper's point —
 >    `ChFGNN` is what succeeds, `1.00/2500` at `p=0`). `BAPG-GW` collapses identically (uniform degrees give
 >    its multiplicative update no first-order signal from the flat start): its regular row equals
->    `Proj(D_cx)`'s cell for cell.
+>    `Proj(D_cx)`'s cell for cell. `FGWAlign`'s accuracy collapses the same way, but its `nce` stays ≈ 820
+>    (of 2500): its random-restart GED search salvages common edges without recovering node identity.
 > 2. At the **FAQ phase transition** (sparse ≈ 0.3, regular ≈ 0.1, dense ≈ 0.25–0.3) the single-network
 >    `FGNN FAQ` row is bimodal and sample-sensitive — with the reduced sample it can sit above `ChFGNN` at a
 >    cell. `ChFGNN` and `FAQ(D_cx)` reproduce stably across the sweep.
@@ -219,7 +239,7 @@ are large and expose the bimodality the mean hides (e.g. `sparse@0.3` ChFGNN-FAQ
 
 ![Per-sample analysis](repro/results/per_sample_analysis.png)
 
-*(a) Each decoder's per-pair accuracy on sparse ER: the transition is **bimodal** — pairs are either solved (≈1) or not (≈0) — which the mean averages over; BAPG-GW's transition starts earliest. (b) ChFGNN-FAQ vs FAQ(D_cx) on every synthetic pair: the **empty lower-right** is the dominance (no pair the baseline solves that ChFGNN misses), and the top-left cloud is the pairs ChFGNN rescues. (c) The same paired view against BAPG-GW: near-dominance — exactly one pair (dense, `p=0.3`) is solved by BAPG-GW and missed by ChFGNN-FAQ; the other below-diagonal points are near-ties at the accuracy ceiling or floor. Regenerate with `make plot` (needs `uv sync --extra viz`).*
+*(a) Each decoder's per-pair accuracy on sparse ER: the transition is **bimodal** — pairs are either solved (≈1) or not (≈0) — which the mean averages over; the two OT relaxations (BAPG-GW, FGWAlign) transition earliest, and together. (b) ChFGNN-FAQ vs FAQ(D_cx) on every synthetic pair: the **empty lower-right** is the dominance (no pair the baseline solves that ChFGNN misses), and the top-left cloud is the pairs ChFGNN rescues. (c) The same paired view against BAPG-GW: near-dominance — exactly one pair (dense, `p=0.3`) is solved by BAPG-GW and missed by ChFGNN-FAQ; the other below-diagonal points are near-ties at the accuracy ceiling or floor. Regenerate with `make plot` (needs `uv sync --extra viz`).*
 
 Because sample index *i* is the **same graph pair** across methods, `make overlap`
 ([`repro/failure_overlap.py`](repro/failure_overlap.py)) compares them pair-by-pair:
@@ -235,6 +255,10 @@ Because sample index *i* is the **same graph pair** across methods, `make overla
   while ChFGNN-FAQ solves 192 pairs BAPG-GW cannot. On dense ER the two relaxations transition together
   (BAPG-GW ≈ FAQ(D_cx), both collapsing at `p=0.25` where ChFGNN holds `0.90`); on sparse ER BAPG-GW
   degrades earlier than every FAQ-decoded method.
+- **FGWAlign behaves as the same solver as BAPG-GW** on these regimes: identical solved/failed status on
+  **469 of 470** pairs (both rescue the *same* dense@0.3 pair the chain misses; ChFGNN-FAQ solves 191
+  pairs FGWAlign cannot), at 10–40× BAPG-GW's runtime. Its only separation is regular-graph `nce`
+  (≈ 820 vs ≈ 50) — see caveat 1.
 
 A tidy long CSV (one row per cell/method/sample) is at
 [`repro/results/samples.csv`](repro/results/samples.csv) (`make samples`) for further analysis.

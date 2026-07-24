@@ -30,9 +30,9 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 DEFAULT = os.path.join(HERE, "results", "repro_seed0.jsonl")
 
 M_COLOR = {"faq_dcx": "#d62728", "fgnn_faq": "#1f77b4", "chfgnn_faq": "#2ca02c",
-           "bapg_proj": "#17becf"}
+           "bapg_proj": "#17becf", "fgwalign": "#e377c2"}
 M_LABEL = {"faq_dcx": "FAQ(D_cx)", "fgnn_faq": "FGNN-FAQ", "chfgnn_faq": "ChFGNN-FAQ",
-           "bapg_proj": "BAPG-GW"}
+           "bapg_proj": "BAPG-GW", "fgwalign": "FGWAlign"}
 FAM_COLOR = {"sparse": "#2ca02c", "dense": "#9467bd", "regular": "#ff7f0e"}
 
 
@@ -60,7 +60,7 @@ def main():
     # Methods absent from the record (e.g. bapg_proj before the add_bapg
     # merge) are skipped rather than crashing.
     noises = sorted(n for (fam, n) in cells if fam == "sparse")
-    methods_a = [m for m in ["faq_dcx", "bapg_proj", "fgnn_faq", "chfgnn_faq"]
+    methods_a = [m for m in ["faq_dcx", "bapg_proj", "fgwalign", "fgnn_faq", "chfgnn_faq"]
                  if all(m in cells[("sparse", n)] for n in noises)]
     for mi, m in enumerate(methods_a):
         xs, ys = [], []

@@ -261,6 +261,32 @@ Final grid (21/21 cells, merged into `repro/results/repro_seed0.jsonl`, key `bap
 - Runtime: full grid ≈ 50 min single-threaded CPU (sparse ≈ 10 s/pair at 2000 iters, dense
   and regular converge to fixed points in well under 1 s/pair).
 
+Timing convention (author request, 2026-07-23): every per-sample evaluation stores a
+`time` array (wall seconds per pair, 2 dp) beside `acc`/`nce` in the method's JSONL
+entry, and progress lines print mean s/pair. `add_bapg.py` and `add_fgwalign.py` both
+record it; the committed `bapg_proj` entries gained `time` via a `--force` rerun on
+2026-07-24 that reproduced every committed acc/nce byte-identically (end-to-end
+determinism check of the replay machinery).
+
+## FGWAlign extension (2026-07-24)
+
+FGWAlign (Tang et al., PVLDB 18(11), 2025 — same group as BAPG) added as a second
+external baseline, key `fgwalign`, via `repro/add_fgwalign.py`. Upstream repo has **no
+license** → not vendored; the driver imports from a user-provided clone (core needs only
+torch/pot/numpy). Protocol: authors' defaults (patience=15, topk=5, full solver) with
+`sparse=True` — the dense path overflows float32 at n=500 (exp(-cost/0.01) on the
+complement-graph term → NaN → segfault inside POT's C EMD; sparse mode drops that term,
+same optimum over permutations). Light variant disqualified (acc 0.03 vs 0.45 at
+sparse@0.1). Stochastic solver → `seed_everything(seed)` before every pair.
+
+Results: **statistically the same solver as BAPG-GW on these regimes** — identical
+solved/failed status on 469/470 pairs; both rescue the same dense@0.3 pair the chain
+misses; chain solves 191 pairs FGWAlign cannot. Sparse/dense rows match BAPG's within
+noise. Only separation: regular-family nce ≈ 820/2500 (vs ≈ 50 for BAPG/Proj(D_cx)) —
+the GED objective salvages common edges at chance node accuracy. Runtime (default
+protocol, 1 CPU core): ~70 s/pair sparse, ~150–210 s/pair dense, ~85–95 s/pair regular
+(≈ 4–4.6 h per family, run in parallel) vs BAPG's ~10 / <1 / <1 s/pair.
+
 ## Risks / gotchas (carry into implementation)
 
 1. **T orientation**: LAP on `-T.T`, not `-T` — the isomorphism test locks it; write it first.
