@@ -138,8 +138,10 @@ in-repo ([`toolbox/bapg.py`](toolbox/bapg.py)) via [POT](https://pythonot.github
 inputs, uniform marginals, step size `epsilon = 0.1`, 2000 iterations, `tol = 1e-6`, square loss.
 The transport plan is projected to a bijection with the Hungarian algorithm (the repo's standard
 decode — a *stronger* extraction than the paper's row-argmax). Its per-sample results are merged
-into the reproduction JSONL by [`repro/add_bapg.py`](repro/add_bapg.py), which replays the seeded
-test pairs exactly (with validation gates) so the comparison is paired per graph pair.
+into the reproduction JSONL by [`repro/add_bapg.py`](repro/add_bapg.py), which replays the seed-0
+test pairs exactly (with validation gates) so the comparison is paired per graph pair. Note
+"seed" here always means the RNG seed of the data generator — the alignment task itself is
+seedless (no node correspondences are revealed to any method).
 
 **FGWAlign** (Tang et al., [*Fused Gromov-Wasserstein Alignment for Graph Edit Distance
 Computation and Beyond*](https://www.vldb.org/pvldb/vol18/p3641-tang.pdf), PVLDB 18(11), 2025)
