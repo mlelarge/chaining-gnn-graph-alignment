@@ -1,5 +1,8 @@
 L : 10
 size_seed: 0
 hard_seed: No
+# Inter-link ranking key: "raw" (matched-incident-edge count m_u, the paper's
+# choice) or "degree_normalized" (m_u / deg, ablation).
+rank_key: raw
 path_models: 'log_models'
 negate_B: true

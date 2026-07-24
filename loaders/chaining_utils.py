@@ -44,6 +44,7 @@ def all_ind(
     compute_faq=False,
     verbose=False,
     size_seed=0,
+    rank_key="raw",
 ) -> InferenceResult:
     ind_data = []
     model = model.to(device)
@@ -64,7 +65,8 @@ def all_ind(
             g1 = copy.deepcopy(data1["input"][:, 0, :, :].cpu().detach().numpy())
             g2 = copy.deepcopy(data2["input"][:, 0, :, :].cpu().detach().numpy())
             for i, weight in enumerate(weights):
-                ind1, col_ind = get_ranking(weight.numpy(), g1[i], g2[i], use_faq)
+                ind1, col_ind = get_ranking(weight.numpy(), g1[i], g2[i], use_faq,
+                                            rank_key=rank_key)
                 pl = np.argmax(planted[i], 1) if has_target else None
                 if random_order:
                     ind1 = np.random.permutation(len(ind1))

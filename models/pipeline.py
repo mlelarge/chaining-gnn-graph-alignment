@@ -78,6 +78,10 @@ class Pipeline(ABC):
     def __init__(self, path_models: str, num_models: int | None = None):
 
         self.path_models = path_models
+        # Inter-link ranking key ("raw" | "degree_normalized"); set from
+        # cfg.pipeline.rank_key at training time and from the saved config.json
+        # at inference time, so a chain is always run the way it was trained.
+        self.rank_key = "raw"
         if num_models:
             self.num_models = num_models
             self.list_models = []
@@ -171,6 +175,7 @@ class Chaining(Pipeline):
             compute_faq=compute_faq,
             verbose=verbose,
             size_seed=size_seed,
+            rank_key=self.rank_key,
         )
         new_data = dg.make_data_from_ind_label(data, result.indices)
         return (
@@ -216,6 +221,7 @@ class Chaining(Pipeline):
     def train(self, cfg: DictConfig, path_dataset: str) -> None:
         self.path_dataset = path_dataset
         self.cfg = cfg
+        self.rank_key = str(OmegaConf.select(cfg, "pipeline.rank_key", default="raw"))
         self.batch_size = self.cfg.training.batch_size
         self.saving = True
         node_embedder = get_model(self.cfg.model)
@@ -292,6 +298,8 @@ class Chaining(Pipeline):
         use_faq_warmstart: bool = False,
     ) -> LoopResult:
         config = load_json(os.path.join(self.path_models, "config.json"))
+        # Run the chain with the ranking key it was trained with.
+        self.rank_key = config.get("pipeline", {}).get("rank_key", "raw")
         data_test = get_data(cfg_data, path_dataset, split="test")
         if self.negate_B:
             _negate_B_channel(data_test)
@@ -672,6 +680,7 @@ class Streaming(Pipeline):
     def train(self, cfg: DictConfig, path_dataset: str) -> None:
         self.path_dataset = path_dataset
         self.cfg = cfg
+        self.rank_key = str(OmegaConf.select(cfg, "pipeline.rank_key", default="raw"))
         self.batch_size = self.cfg.training.batch_size
         self.saving = cfg.saving
         node_embedder = get_model(self.cfg.model)
