@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from omegaconf import OmegaConf, DictConfig
 import torch
 import os
+import gc
 import wandb
 from typing import Any, Optional, TYPE_CHECKING
 import time
@@ -268,6 +269,86 @@ class Chaining(Pipeline):
                 )
             else:
                 new_train = self.train_data(new_train, siamese, L=i)
+
+    def _ckpt_for_link(self, i):
+        """Path of the saved checkpoint for chain link ``i`` (or None)."""
+        import glob
+        g = sorted(glob.glob(os.path.join(self.path_models, f"siamese_{i:02d}-*.ckpt")))
+        return g[-1] if g else None
+
+    def train_chunk(self, cfg: DictConfig, path_dataset: str, chunk_size: int) -> int:
+        """Resumable chunked training for short (qos_dev) jobs.
+
+        Trains up to ``chunk_size`` new chain links per call, resuming from the
+        checkpoints already on disk. Prior links are *replayed* (feedback only,
+        no re-training) to rebuild the training data; the first new link
+        warm-starts from the previous link's checkpoint, exactly as the
+        monolithic ``train`` chains links 2.. off a single carried model. Idempotent:
+        re-run until it returns ``L`` (all links present). Returns the number of
+        links completed after this call.
+        """
+        from toolbox.utils import seed_everything
+
+        self.path_dataset = path_dataset
+        self.cfg = cfg
+        self.rank_key = str(OmegaConf.select(cfg, "pipeline.rank_key", default="raw"))
+        self.random_order = bool(OmegaConf.select(cfg, "pipeline.random_order", default=False))
+        self.batch_size = cfg.training.batch_size
+        self.saving = True
+        os.makedirs(self.path_models, exist_ok=True)
+        cfg_path = os.path.join(self.path_models, "config.json")
+        if not os.path.exists(cfg_path):
+            save_json(cfg_path, OmegaConf.to_container(cfg, resolve=True))
+
+        node_embedder = get_model(cfg.model)
+        mode = self._siamese_mode
+        L = self.num_models
+
+        completed = 0
+        while self._ckpt_for_link(completed) is not None:
+            completed += 1
+        if completed >= L:
+            print(f"[chunk] all {L} links already trained")
+            return L
+
+        # Deterministic data (cached parquet is identical across jobs).
+        seed_everything(int(OmegaConf.select(cfg, "dataset.seed", default=0)))
+        new_train, new_val = get_data(cfg.dataset, path_dataset, self.saving, split="train_val")
+        if self.negate_B:
+            _negate_B_channel(new_train)
+            if new_val is not None:
+                _negate_B_channel(new_val)
+
+        # Replay already-trained links: apply their feedback, do NOT retrain.
+        for i in range(completed):
+            m = get_siamese_name(self._ckpt_for_link(i), cfg.model, mode=mode)
+            new_train, *_ = self.build_ind(new_train, m)
+            if new_val is not None:
+                new_val, *_ = self.build_ind(new_val, m)
+            del m
+            gc.collect()
+        print(f"[chunk] replayed {completed} link(s); training {completed}..{min(completed + chunk_size, L) - 1}")
+
+        opt_base = _make_opt_cfg(cfg.training)
+        opt_sub = _make_opt_cfg(
+            cfg.training, lr_override=getattr(cfg.training, "lr_subsequent", cfg.training.lr)
+        )
+        end = min(completed + chunk_size, L)
+        siamese = None
+        for i in range(completed, end):
+            if i <= 1:  # links 0 and 1 are each freshly initialised in train()
+                siamese = get_siamese(node_embedder, opt_cfg=(opt_base if i == 0 else opt_sub), mode=mode)
+            elif siamese is None:  # first new link of a resumed chunk: warm-start from prev
+                siamese = get_siamese_name(self._ckpt_for_link(i - 1), cfg.model, opt_cfg=opt_sub, mode=mode)
+            # else: reuse the carried model (warm continuation within this chunk)
+            if self.use_labels:
+                new_train, new_val = self.train_data(new_train, siamese, L=i, data_val=new_val)
+            else:
+                new_train = self.train_data(new_train, siamese, L=i)
+        del siamese, new_train, new_val
+        gc.collect()
+        print(f"[chunk] done through link {end - 1}/{L - 1}")
+        return end
 
     def _check_improvement(self, delta, current_max_nce, eps, stop, patience):
         """Check early stopping criterion with safe division."""
