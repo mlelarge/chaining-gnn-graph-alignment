@@ -121,6 +121,7 @@ def train_siamese(
     lr_stop=1e-7,
     wandb=False,
     val_loader=None,
+    accumulate_grad_batches=1,
 ):
     model_name = f"siamese_{L:02d}"
     use_labels = not isinstance(siamese, Siamese_Node_NL)
@@ -171,6 +172,7 @@ def train_siamese(
         precision="16-mixed",
         logger=logger,
         log_every_n_steps=log_every_n_steps,
+        accumulate_grad_batches=accumulate_grad_batches,
         callbacks=[checkpoint_callback, lr_monitor, lr_es],
     )
     trainer.fit(siamese, train_loader, val_loader)

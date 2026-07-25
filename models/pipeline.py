@@ -211,6 +211,9 @@ class Chaining(Pipeline):
             self.cfg.training.lr_stop,
             self.cfg.training.wandb,
             val_loader=val_loader,
+            accumulate_grad_batches=int(
+                OmegaConf.select(self.cfg, "training.accumulate_grad_batches", default=1)
+            ),
         )
 
         new_train, *_ = self.build_ind(data_train, siamese)
@@ -685,6 +688,9 @@ class Streaming(Pipeline):
             self.cfg.training.lr_stop,
             self.cfg.training.wandb,
             val_loader=val_loader,
+            accumulate_grad_batches=int(
+                OmegaConf.select(self.cfg, "training.accumulate_grad_batches", default=1)
+            ),
         )
 
         if self.cfg.training.wandb:
