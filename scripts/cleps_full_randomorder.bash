@@ -34,7 +34,7 @@ srun $PY commander.py dataset=sparse dataset.noise=0.22 \
     pipeline.path_models=${SLURM_JOB_NAME} \
     model.in_features=256 training.batch_size=3 training.accumulate_grad_batches=2 \
     training.wandb=false \
-    hydra/run=cluster root_dir=/scratch/lelarge
+    hydra/run=default root_dir=/scratch/lelarge
 RC=$?
 [ "$RC" -eq 0 ] && echo "DONE_OK" || echo "FAIL_RC=$RC"
 exit $RC
