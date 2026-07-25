@@ -28,5 +28,5 @@ ROOTDIR=${SCRATCH:-/lustre/fsn1/projects/rech/tdm/uuz44ie}
 srun python commander.py dataset=sparse dataset.noise=0.22 \
     pipeline.rank_key=degree_normalized pipeline.L=15 \
     pipeline.path_models=${SLURM_JOB_NAME} \
-    model.in_features=256 training.batch_size=6 \
+    model.in_features=256 training.batch_size=6 training.epochs=100 \
     hydra/run=cluster root_dir=$ROOTDIR
