@@ -28,7 +28,7 @@ set -x
 srun $PY commander.py dataset=sparse dataset.noise=0.22 \
     pipeline.random_order=true pipeline.L=15 \
     pipeline.path_models=${SLURM_JOB_NAME} \
-    model.in_features=256 training.batch_size=6 \
+    model.in_features=256 training.batch_size=6 training.epochs=100 \
     training.wandb=true \
     hydra/run=default root_dir=/scratch/lelarge
 RC=$?
