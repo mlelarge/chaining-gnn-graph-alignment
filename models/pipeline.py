@@ -387,11 +387,16 @@ class Chaining(Pipeline):
         timing: bool = False,
         use_faq_warmstart: bool = False,
         random_order: bool | None = None,
+        rank_key: str | None = None,
     ) -> LoopResult:
         config = load_json(os.path.join(self.path_models, "config.json"))
         # Run the chain the way it was trained (ranking key + order); an explicit
-        # random_order overrides the stored config (for inference-time ablation).
-        self.rank_key = config.get("pipeline", {}).get("rank_key", "raw")
+        # rank_key / random_order overrides the stored config (inference-time ablation).
+        self.rank_key = (
+            config.get("pipeline", {}).get("rank_key", "raw")
+            if rank_key is None
+            else rank_key
+        )
         self.random_order = (
             config.get("pipeline", {}).get("random_order", False)
             if random_order is None
