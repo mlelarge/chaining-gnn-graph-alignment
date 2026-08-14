@@ -102,6 +102,24 @@ def _model_metrics(loader, model):
     }
 
 
+def unseeded_loader(dataset):
+    """Loader for the un-chained (single-network) pass over a test set.
+
+    Takes the dataset *object*, never its ``.data`` list. ``masking_noseed`` runs
+    from ``Base_Generator.__getitem__``, so a raw list never gets masked — and on
+    an unseeded pass the seed channel it zeroes still holds the planted
+    permutation (``adjacency_matrix_to_tensor_representation`` writes ``i/n`` on
+    the diagonal, and ``all_perm`` permutes only graph A), i.e. the ground truth.
+    """
+    if not hasattr(dataset, "__getitem__") or isinstance(dataset, (list, tuple)):
+        raise TypeError(
+            "unseeded_loader needs the dataset object, not its .data list: a raw "
+            "list bypasses masking_noseed and leaks the planted permutation "
+            "through the seed channel."
+        )
+    return siamese_loader(dataset, batch_size=1, shuffle=False)
+
+
 def run_synthetic(family, args, out_path):
     spec = SYNTHETIC[family]
     path_models = download_release(spec["release"], args.checkpoint_dir)
@@ -124,7 +142,7 @@ def run_synthetic(family, args, out_path):
         chain = Chaining(path_models)
         m0 = get_siamese_name(os.path.join(path_models, chain.list_models[0]),
                               config["model"], mode=SiameseMode.LABELED).to(chain.device)
-        fgnn = _model_metrics(siamese_loader(raw.data, batch_size=1, shuffle=False), m0)
+        fgnn = _model_metrics(unseeded_loader(raw), m0)                # FGNN (single net)
         loop_kw = {"N_max": args.N_max} if args.N_max is not None else {}
         res = chain.loop(cfg, data_dir, **loop_kw)                    # ChFGNN (chained)
         chf = _model_metrics(siamese_loader(res.best_data, batch_size=1, shuffle=False),
