@@ -145,9 +145,10 @@ python commander.py dataset=ca_netscience          # real-world (after prepare_d
 
 Accuracy / number of common edges (`acc / nce`) as a function of the noise `p`. The numbers below are
 **reproduced** with `make reproduce` (fixed seed 0; 30 test pairs per cell, 10 for dense) from the run in
-[`repro/results/repro_seed0.jsonl`](repro/results/repro_seed0.jsonl), and reproduce the paper's Table.
-`Proj` and `FAQ` are post-processing decoders; `FGNN` is a single network and `ChFGNN` the chained
-variant. Regenerate the table with `make reproduce`; re-run the paper's settings with `make synthetic`.
+[`repro/results/repro_seed0.jsonl`](repro/results/repro_seed0.jsonl), and reproduce the paper's Table for
+every row but the single-network `FGNN` ones (caveat 3 below). `Proj` and `FAQ` are post-processing
+decoders; `FGNN` is a single network and `ChFGNN` the chained variant. Regenerate the table with
+`make reproduce`; re-run the paper's settings with `make synthetic`.
 
 **Sparse Erdős–Rényi, average degree 4** (nce_max ≈ 1000):
 
@@ -155,8 +156,8 @@ variant. Regenerate the table with `make reproduce`; re-run the paper's settings
 |---|---|---|---|---|---|---|---|---|
 | Proj(D_cx) | 0.98/994 | 0.98/944 | 0.91/849 | 0.58/482 | 0.22/195 | 0.088/131 | 0.040/117 | 0.020/117 |
 | FAQ(D_cx) | 0.98/994 | 0.97/945 | 0.97/895 | 0.94/841 | 0.64/683 | 0.12/499 | 0.037/484 | 0.015/481 |
-| FGNN Proj | 1.00/994 | 0.88/792 | 0.69/512 | 0.52/314 | 0.38/196 | 0.29/135 | 0.22/95 | 0.16/72 |
-| FGNN FAQ | 0.98/994 | 0.98/945 | 0.97/895 | 0.95/843 | 0.92/790 | 0.85/732 | 0.58/620 | 0.25/516 |
+| FGNN Proj | 0.98/994 | 0.75/686 | 0.43/330 | 0.23/166 | 0.12/113 | 0.066/96 | 0.039/87 | 0.024/82 |
+| FGNN FAQ | 0.98/994 | 0.97/944 | 0.96/894 | 0.93/833 | 0.34/567 | 0.100/494 | 0.039/482 | 0.019/480 |
 | ChFGNN Proj | 0.98/994 | 0.98/945 | 0.97/894 | 0.95/840 | 0.91/783 | 0.85/722 | 0.40/451 | 0.035/261 |
 | ChFGNN FAQ | 0.98/994 | 0.98/945 | 0.97/895 | 0.95/843 | 0.93/792 | 0.88/744 | 0.44/608 | 0.033/520 |
 
@@ -166,8 +167,8 @@ variant. Regenerate the table with `make reproduce`; re-run the paper's settings
 |---|---|---|---|---|---|---|---|---|
 | Proj(D_cx) | 1.00/19906 | 1.00/18904 | 1.00/17882 | 0.67/9827 | 0.17/3975 | 0.049/3664 | 0.024/3646 | 0.012/3604 |
 | FAQ(D_cx) | 1.00/19906 | 1.00/18904 | 1.00/17896 | 1.00/16912 | 1.00/15899 | 0.32/8854 | 0.014/6226 | 0.006/6218 |
-| FGNN Proj | 1.00/19906 | 1.00/18891 | 0.80/12764 | 0.45/6228 | 0.26/4296 | 0.15/3677 | 0.094/3517 | 0.056/3417 |
-| FGNN FAQ | 1.00/19906 | 1.00/18904 | 1.00/17896 | 1.00/16912 | 1.00/15899 | 1.00/14911 | 0.81/12365 | 0.12/6897 |
+| FGNN Proj | 1.00/19906 | 0.99/18620 | 0.51/7293 | 0.20/4011 | 0.087/3523 | 0.040/3446 | 0.026/3497 | 0.014/3460 |
+| FGNN FAQ | 1.00/19906 | 1.00/18904 | 1.00/17896 | 1.00/16912 | 0.91/14934 | 0.12/7119 | 0.010/6241 | 0.005/6225 |
 | ChFGNN Proj | 1.00/19906 | 1.00/18904 | 0.95/16584 | 0.82/12699 | 0.73/10333 | 0.49/7026 | 0.082/4278 | 0.014/4037 |
 | ChFGNN FAQ | 1.00/19906 | 1.00/18904 | 1.00/17896 | 1.00/16912 | 1.00/15899 | 0.90/14050 | 0.22/7800 | 0.009/6272 |
 
@@ -177,19 +178,24 @@ variant. Regenerate the table with `make reproduce`; re-run the paper's settings
 |---|---|---|---|---|---|
 | Proj(D_cx) | 0.002/51 | 0.002/51 | 0.002/51 | 0.002/50 | 0.002/50 |
 | FAQ(D_cx) | 0.002/623 | 0.002/491 | 0.002/571 | 0.002/646 | 0.002/409 |
-| FGNN Proj | 1.00/2500 | 0.40/465 | 0.16/133 | 0.085/82 | 0.068/72 |
-| FGNN FAQ | 1.00/2500 | 0.95/2052 | 0.89/1693 | 0.10/849 | 0.032/834 |
+| FGNN Proj | 1.00/2500 | 0.13/155 | 0.019/92 | 0.005/88 | 0.003/90 |
+| FGNN FAQ | 1.00/2500 | 0.95/2052 | 0.016/837 | 0.003/834 | 0.003/838 |
 | ChFGNN Proj | 1.00/2500 | 0.72/1329 | 0.27/518 | 0.005/296 | 0.004/290 |
 | ChFGNN FAQ | 1.00/2500 | 0.96/2052 | 0.60/1416 | 0.003/865 | 0.003/869 |
 
-> **Two caveats** for the reproduced numbers (fixed seed, reduced sample — close to but not bit-identical
+> **Three caveats** for the reproduced numbers (fixed seed, reduced sample — close to but not bit-identical
 > to the unseeded paper):
 > 1. On **regular** graphs the convex relaxation is degenerate, so `Proj(D_cx)`/`FAQ(D_cx)` collapse to a
 >    near-random alignment; their `nce` is high-variance and only approximate (this *is* the paper's point —
 >    `ChFGNN` is what succeeds, `1.00/2500` at `p=0`).
-> 2. At the **FAQ phase transition** (sparse ≈ 0.3, regular ≈ 0.1, dense ≈ 0.25–0.3) the single-network
->    `FGNN FAQ` row is bimodal and sample-sensitive — with the reduced sample it can sit above `ChFGNN` at a
->    cell. `ChFGNN` and `FAQ(D_cx)` reproduce stably across the sweep.
+> 2. Every `FAQ` row is **bimodal** at its phase transition — pairs are either solved (≈1) or not (≈0) — so
+>    the mean is sample-sensitive there. The single-network `FGNN FAQ` transition is sharp and early (sparse
+>    between `p=0.15` and `0.25`, dense between `0.2` and `0.25`, regular between `0.05` and `0.1`);
+>    `ChFGNN FAQ` moves each of them to higher noise, which is the effect these tables exist to show.
+> 3. The single-network `FGNN` rows land **below** the paper's Table 2 (sparse `p=0.2`: `0.12/0.34` here vs
+>    `0.23/0.81` there). These rows evaluate the *first link of the released chain*, which is not the
+>    standalone single network the paper trained for that row. `Proj(D_cx)`, `FAQ(D_cx)` and both `ChFGNN`
+>    rows do reproduce the paper.
 
 ### Per-sample analysis (uncertainty & failure overlap)
 
@@ -210,8 +216,10 @@ Because sample index *i* is the **same graph pair** across methods, `make overla
   convex baseline solves, and at the transition it solves many the baseline cannot (e.g. +30 of 30 at
   `sparse@0.25`, +20 of 30 at `regular@0.1`); the remaining hard pairs are common to both. This is a
   stronger, instance-level version of the mean curves.
-- Against its own single-network ablation it is **not** dominant: `FGNN-FAQ` solves 27 transition pairs that
-  `ChFGNN-FAQ` misses — the per-sample face of the phase-transition variance noted above.
+- **It is a strict superset of its own single-network ablation too.** `FGNN-FAQ` never solves a pair
+  `ChFGNN-FAQ` misses, in any cell, while chaining rescues 99 pairs the single network fails (+23 of 30 at
+  `sparse@0.2`, +30 of 30 at `sparse@0.25`, +20 of 30 at `regular@0.1`). Run it with
+  `make overlap ARGS="--a chfgnn_faq --b fgnn_faq"`.
 
 A tidy long CSV (one row per cell/method/sample) is at
 [`repro/results/samples.csv`](repro/results/samples.csv) (`make samples`) for further analysis.
