@@ -109,9 +109,10 @@ tables:
 samples:
 	$(PYTHON) repro/samples_to_csv.py repro/results/repro_seed0.jsonl -o repro/results/samples.csv
 
-# Per-sample failure overlap of two methods (default ChFGNN-FAQ vs FAQ(D_cx)).
+# Per-sample failure overlap of two methods (default ChFGNN-FAQ vs FAQ(D_cx)). Compare
+# other pairs with e.g. make overlap ARGS="--a chfgnn_faq --b fgnn_faq".
 overlap:
-	$(PYTHON) repro/failure_overlap.py repro/results/repro_seed0.jsonl
+	$(PYTHON) repro/failure_overlap.py repro/results/repro_seed0.jsonl $(ARGS)
 
 # Per-sample analysis figure (needs the viz extra: `uv sync --extra viz`).
 plot:
