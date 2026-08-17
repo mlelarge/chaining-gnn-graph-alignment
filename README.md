@@ -257,10 +257,10 @@ Because sample index *i* is the **same graph pair** across methods, `make overla
   `sparse@0.25`, +20 of 30 at `regular@0.1`); the remaining hard pairs are common to both. This is a
   stronger, instance-level version of the mean curves.
 - **It is a strict superset of its own single-network ablation too**
-  (`python repro/failure_overlap.py --a chfgnn_faq --b fgnn_faq`). `FGNN-FAQ` never solves a pair
+  (`make overlap ARGS="--a chfgnn_faq --b fgnn_faq"`). `FGNN-FAQ` never solves a pair
   `ChFGNN-FAQ` misses, in any cell, while chaining rescues 99 pairs the single network fails (+23 of 30 at
   `sparse@0.2`, +30 of 30 at `sparse@0.25`, +20 of 30 at `regular@0.1`).
-- Against **BAPG-GW** (`python repro/failure_overlap.py --a chfgnn_faq --b bapg_proj`): near-strict dominance —
+- Against **BAPG-GW** (`make overlap ARGS="--a chfgnn_faq --b bapg_proj"`): near-strict dominance —
   across all 470 synthetic pairs, BAPG-GW solves exactly **one** pair (dense@0.3) that ChFGNN-FAQ misses,
   while ChFGNN-FAQ solves 192 pairs BAPG-GW cannot. On dense ER the two relaxations transition together
   (BAPG-GW ≈ FAQ(D_cx), both collapsing at `p=0.25` where ChFGNN holds `0.90`); on sparse ER BAPG-GW
