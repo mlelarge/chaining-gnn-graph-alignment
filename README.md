@@ -122,7 +122,7 @@ random draw — the base graph (for synthetic), the edge add/remove noise, and t
 | `v1.1.0-yeast25lc-pn0.05` / `-pn0.1` | ChFGNN, yeast25LC (noise 0.05 / 0.1) |
 | `v1.1.0-multimagna` | ChFGNN, MultiMAGNA yeast |
 
-### Baselines (FAQ, FUGAL, SGWL)
+### Baselines (FAQ, BAPG-GW, FGWAlign, FUGAL, SGWL)
 
 `run_baseline.py` reproduces the in-repo FAQ baselines — **FAQ(D_cx)**, **FAQ(J)**, and the
 **Max-nce** ceiling (FAQ seeded from the true permutation). The external baselines are **not**
@@ -130,6 +130,32 @@ vendored: **FUGAL** ([idea-iitd/Fugal](https://github.com/idea-iitd/Fugal), `mu=
 (Xu et al., 2019) numbers come from their authors' code. Note that the FAQ numbers reported by some
 prior work use the barycenter `J` initialization; initializing FAQ from the convex relaxation
 (`FAQ(D_cx)`) already surpasses those.
+
+**BAPG-GW** (Li et al., [*A Convergent Single-Loop Algorithm for Relaxation of
+Gromov-Wasserstein in Graph Data*](https://arxiv.org/abs/2303.06595), ICLR 2023) is reproduced
+in-repo ([`toolbox/bapg.py`](toolbox/bapg.py)) via [POT](https://pythonot.github.io/)'s
+`ot.gromov.BAPG_gromov_wasserstein`, with the paper's graph-alignment protocol: raw adjacency
+inputs, uniform marginals, step size `epsilon = 0.1`, 2000 iterations, `tol = 1e-6`, square loss.
+The transport plan is projected to a bijection with the Hungarian algorithm (the repo's standard
+decode — a *stronger* extraction than the paper's row-argmax). Its per-sample results are merged
+into the reproduction JSONL by [`repro/add_bapg.py`](repro/add_bapg.py), which replays the seed-0
+test pairs exactly (with validation gates) so the comparison is paired per graph pair. Note
+"seed" here always means the RNG seed of the data generator — the alignment task itself is
+seedless (no node correspondences are revealed to any method).
+
+**FGWAlign** (Tang et al., [*Fused Gromov-Wasserstein Alignment for Graph Edit Distance
+Computation and Beyond*](https://www.vldb.org/pvldb/vol18/p3641-tang.pdf), PVLDB 18(11), 2025)
+is evaluated per-sample on the same pairs, but is **not vendored**: the
+[upstream repository](https://github.com/squareRoot3/FGWAlign) carries no license, so
+[`repro/add_fgwalign.py`](repro/add_fgwalign.py) imports it from a clone you provide
+(`--fgwalign-path`; its core function needs only torch/pot/numpy, all already in this
+environment). Settings: the authors' defaults (`patience=15`, `topk=5`, full solver) with
+`sparse=True` — the dense code path overflows float32 at n=500 (NaN plan → crash inside POT's
+EMD; see the driver's docstring), and the sparse path's objective has the same optimum over
+permutations. Its GED objective is equivalent to maximizing `nce` here (unlabeled, equal-size
+graphs: `GED = |E1|+|E2|−2·nce`). Runtime is the trade-off: ~70 s/pair (sparse family),
+~150–210 s/pair (dense), ~85–95 s/pair (regular) on one CPU core, vs ~10/&lt;1/&lt;1 s/pair
+for BAPG-GW.
 
 ## Training from scratch
 
@@ -146,9 +172,14 @@ python commander.py dataset=ca_netscience          # real-world (after prepare_d
 Accuracy / number of common edges (`acc / nce`) as a function of the noise `p`. The numbers below are
 **reproduced** with `make reproduce` (fixed seed 0; 30 test pairs per cell, 10 for dense) from the run in
 [`repro/results/repro_seed0.jsonl`](repro/results/repro_seed0.jsonl), and reproduce the paper's Table for
-every row but the single-network `FGNN` ones (caveat 3 below). `Proj` and `FAQ` are post-processing
-decoders; `FGNN` is a single network and `ChFGNN` the chained variant. Regenerate the table with
-`make reproduce`; re-run the paper's settings with `make synthetic`.
+every row but the single-network `FGNN` ones (caveat 3 below).
+`Proj` and `FAQ` are post-processing decoders; `FGNN` is a single network and `ChFGNN` the chained
+variant. The `BAPG-GW Proj` and `FGWAlign` rows are post-paper additions (see
+[Baselines](#baselines-faq-bapg-gw-fgwalign-fugal-sgwl)), evaluated on the same pairs by
+`python -m repro.add_bapg --out merged.jsonl` and `python -m repro.add_fgwalign --fgwalign-path
+<clone> --out merged2.jsonl`. Regenerate the table with `make reproduce`, then merge those rows into
+the fresh JSONL the same way (the tables render `–` for them until merged); re-run the paper's
+settings with `make synthetic`.
 
 **Sparse Erdős–Rényi, average degree 4** (nce_max ≈ 1000):
 
@@ -156,6 +187,8 @@ decoders; `FGNN` is a single network and `ChFGNN` the chained variant. Regenerat
 |---|---|---|---|---|---|---|---|---|
 | Proj(D_cx) | 0.98/994 | 0.98/944 | 0.91/849 | 0.58/482 | 0.22/195 | 0.088/131 | 0.040/117 | 0.020/117 |
 | FAQ(D_cx) | 0.98/994 | 0.97/945 | 0.97/895 | 0.94/841 | 0.64/683 | 0.12/499 | 0.037/484 | 0.015/481 |
+| BAPG-GW Proj | 0.98/994 | 0.89/893 | 0.71/772 | 0.35/624 | 0.13/548 | 0.062/528 | 0.020/520 | 0.009/520 |
+| FGWAlign | 0.98/994 | 0.88/886 | 0.70/767 | 0.34/618 | 0.13/546 | 0.062/528 | 0.021/520 | 0.010/520 |
 | FGNN Proj | 0.98/994 | 0.75/686 | 0.43/330 | 0.23/166 | 0.12/113 | 0.066/96 | 0.039/87 | 0.024/82 |
 | FGNN FAQ | 0.98/994 | 0.97/944 | 0.96/894 | 0.93/833 | 0.34/567 | 0.100/494 | 0.039/482 | 0.019/480 |
 | ChFGNN Proj | 0.98/994 | 0.98/945 | 0.97/894 | 0.95/840 | 0.91/783 | 0.85/722 | 0.40/451 | 0.035/261 |
@@ -167,6 +200,8 @@ decoders; `FGNN` is a single network and `ChFGNN` the chained variant. Regenerat
 |---|---|---|---|---|---|---|---|---|
 | Proj(D_cx) | 1.00/19906 | 1.00/18904 | 1.00/17882 | 0.67/9827 | 0.17/3975 | 0.049/3664 | 0.024/3646 | 0.012/3604 |
 | FAQ(D_cx) | 1.00/19906 | 1.00/18904 | 1.00/17896 | 1.00/16912 | 1.00/15899 | 0.32/8854 | 0.014/6226 | 0.006/6218 |
+| BAPG-GW Proj | 1.00/19906 | 1.00/18904 | 1.00/17896 | 1.00/16912 | 1.00/15899 | 0.32/8832 | 0.13/7018 | 0.011/6208 |
+| FGWAlign | 1.00/19906 | 1.00/18904 | 1.00/17869 | 1.00/16842 | 1.00/15784 | 0.32/8595 | 0.13/6981 | 0.014/6208 |
 | FGNN Proj | 1.00/19906 | 0.99/18620 | 0.51/7293 | 0.20/4011 | 0.087/3523 | 0.040/3446 | 0.026/3497 | 0.014/3460 |
 | FGNN FAQ | 1.00/19906 | 1.00/18904 | 1.00/17896 | 1.00/16912 | 0.91/14934 | 0.12/7119 | 0.010/6241 | 0.005/6225 |
 | ChFGNN Proj | 1.00/19906 | 1.00/18904 | 0.95/16584 | 0.82/12699 | 0.73/10333 | 0.49/7026 | 0.082/4278 | 0.014/4037 |
@@ -178,6 +213,8 @@ decoders; `FGNN` is a single network and `ChFGNN` the chained variant. Regenerat
 |---|---|---|---|---|---|
 | Proj(D_cx) | 0.002/51 | 0.002/51 | 0.002/51 | 0.002/50 | 0.002/50 |
 | FAQ(D_cx) | 0.002/623 | 0.002/491 | 0.002/571 | 0.002/646 | 0.002/409 |
+| BAPG-GW Proj | 0.002/51 | 0.002/51 | 0.002/51 | 0.002/50 | 0.002/50 |
+| FGWAlign | 0.003/821 | 0.002/820 | 0.003/821 | 0.002/821 | 0.002/821 |
 | FGNN Proj | 1.00/2500 | 0.13/155 | 0.019/92 | 0.005/88 | 0.003/90 |
 | FGNN FAQ | 1.00/2500 | 0.95/2052 | 0.016/837 | 0.003/834 | 0.003/838 |
 | ChFGNN Proj | 1.00/2500 | 0.72/1329 | 0.27/518 | 0.005/296 | 0.004/290 |
@@ -187,7 +224,10 @@ decoders; `FGNN` is a single network and `ChFGNN` the chained variant. Regenerat
 > to the unseeded paper):
 > 1. On **regular** graphs the convex relaxation is degenerate, so `Proj(D_cx)`/`FAQ(D_cx)` collapse to a
 >    near-random alignment; their `nce` is high-variance and only approximate (this *is* the paper's point —
->    `ChFGNN` is what succeeds, `1.00/2500` at `p=0`).
+>    `ChFGNN` is what succeeds, `1.00/2500` at `p=0`). `BAPG-GW` collapses identically (uniform degrees give
+>    its multiplicative update no first-order signal from the flat start): its regular row equals
+>    `Proj(D_cx)`'s cell for cell. `FGWAlign`'s accuracy collapses the same way, but its `nce` stays ≈ 820
+>    (of 2500): its random-restart GED search salvages common edges without recovering node identity.
 > 2. Every `FAQ` row is **bimodal** at its phase transition — pairs are either solved (≈1) or not (≈0) — so
 >    the mean is sample-sensitive there. The single-network `FGNN FAQ` transition is sharp and early (sparse
 >    between `p=0.15` and `0.25`, dense between `0.2` and `0.25`, regular between `0.05` and `0.1`);
@@ -207,7 +247,7 @@ are large and expose the bimodality the mean hides (e.g. `sparse@0.3` ChFGNN-FAQ
 
 ![Per-sample analysis](repro/results/per_sample_analysis.png)
 
-*(a) Each decoder's per-pair accuracy on sparse ER: the transition is **bimodal** — pairs are either solved (≈1) or not (≈0) — which the mean averages over. (b) ChFGNN-FAQ vs FAQ(D_cx) on every synthetic pair: the **empty lower-right** is the dominance (no pair the baseline solves that ChFGNN misses), and the top-left cloud is the pairs ChFGNN rescues. Regenerate with `make plot` (needs `uv sync --extra viz`).*
+*(a) Each decoder's per-pair accuracy on sparse ER: the transition is **bimodal** — pairs are either solved (≈1) or not (≈0) — which the mean averages over; the two OT relaxations (BAPG-GW, FGWAlign) transition earliest, and together. (b) ChFGNN-FAQ vs FAQ(D_cx) on every synthetic pair: the **empty lower-right** is the dominance (no pair the baseline solves that ChFGNN misses), and the top-left cloud is the pairs ChFGNN rescues. (c) The same paired view against BAPG-GW: near-dominance — exactly one pair (dense, `p=0.3`) is solved by BAPG-GW and missed by ChFGNN-FAQ; the other below-diagonal points are near-ties at the accuracy ceiling or floor. Regenerate with `make plot` (needs `uv sync --extra viz`).*
 
 Because sample index *i* is the **same graph pair** across methods, `make overlap`
 ([`repro/failure_overlap.py`](repro/failure_overlap.py)) compares them pair-by-pair:
@@ -216,10 +256,19 @@ Because sample index *i* is the **same graph pair** across methods, `make overla
   convex baseline solves, and at the transition it solves many the baseline cannot (e.g. +30 of 30 at
   `sparse@0.25`, +20 of 30 at `regular@0.1`); the remaining hard pairs are common to both. This is a
   stronger, instance-level version of the mean curves.
-- **It is a strict superset of its own single-network ablation too.** `FGNN-FAQ` never solves a pair
+- **It is a strict superset of its own single-network ablation too**
+  (`make overlap ARGS="--a chfgnn_faq --b fgnn_faq"`). `FGNN-FAQ` never solves a pair
   `ChFGNN-FAQ` misses, in any cell, while chaining rescues 99 pairs the single network fails (+23 of 30 at
-  `sparse@0.2`, +30 of 30 at `sparse@0.25`, +20 of 30 at `regular@0.1`). Run it with
-  `make overlap ARGS="--a chfgnn_faq --b fgnn_faq"`.
+  `sparse@0.2`, +30 of 30 at `sparse@0.25`, +20 of 30 at `regular@0.1`).
+- Against **BAPG-GW** (`make overlap ARGS="--a chfgnn_faq --b bapg_proj"`): near-strict dominance —
+  across all 470 synthetic pairs, BAPG-GW solves exactly **one** pair (dense@0.3) that ChFGNN-FAQ misses,
+  while ChFGNN-FAQ solves 192 pairs BAPG-GW cannot. On dense ER the two relaxations transition together
+  (BAPG-GW ≈ FAQ(D_cx), both collapsing at `p=0.25` where ChFGNN holds `0.90`); on sparse ER BAPG-GW
+  degrades earlier than every FAQ-decoded method.
+- **FGWAlign behaves as the same solver as BAPG-GW** on these regimes: identical solved/failed status on
+  **469 of 470** pairs (both rescue the *same* dense@0.3 pair the chain misses; ChFGNN-FAQ solves 191
+  pairs FGWAlign cannot), at 10–40× BAPG-GW's runtime. Its only separation is regular-graph `nce`
+  (≈ 820 vs ≈ 50) — see caveat 1.
 
 A tidy long CSV (one row per cell/method/sample) is at
 [`repro/results/samples.csv`](repro/results/samples.csv) (`make samples`) for further analysis.

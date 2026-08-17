@@ -1,5 +1,6 @@
 epochs: 400
 batch_size:  64 #256 #64
+accumulate_grad_batches: 1  # effective batch = batch_size * this (GraphNorm is per-graph, so accumulation reproduces a larger batch exactly)
 lr: !!float 1e-4
 scheduler_step: 3
 scheduler_decay: 0.5

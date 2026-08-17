@@ -20,6 +20,7 @@ dependencies = [
     "tqdm>=4.67.1",
     "wandb>=0.22.0",
     "torch-geometric>=2.5.0",
+    "pot>=0.9.4",
 ]
 
 [project.optional-dependencies]

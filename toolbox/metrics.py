@@ -136,6 +136,7 @@ def get_ranking(
     g1: np.ndarray,
     g2: np.ndarray,
     use_faq: bool = False,
+    rank_key: str = "raw",
 ) -> tuple:
     """Solve linear assignment and rank nodes by edge overlap score.
 
@@ -143,10 +144,13 @@ def get_ranking(
         weight: (n, n) cost matrix to maximize.
         g1, g2: (n, n) adjacency matrices.
         use_faq: If True, refine the assignment using FAQ (quadratic_assignment).
+        rank_key: "raw" ranks by the matched-incident-edge count m_u (the
+            paper's choice — the per-node term of the nce objective);
+            "degree_normalized" ranks by m_u / max(deg_g1(u), 1) (ablation).
 
     Returns:
         (row_ordering, col_ind):
-        - row_ordering: Node indices sorted by ascending edge overlap score.
+        - row_ordering: Node indices sorted by ascending rank key.
         - col_ind: Optimal column assignment (permutation).
 
     Note:
@@ -158,6 +162,10 @@ def get_ranking(
         col_ind, _ = faq_refinement(col_ind, g1, g2)
 
     maxi = (g1 * g2[col_ind, :][:, col_ind]).sum(1)
+    if rank_key == "degree_normalized":
+        maxi = maxi / np.maximum(g1.sum(1), 1.0)
+    elif rank_key != "raw":
+        raise ValueError(f"unknown rank_key: {rank_key!r}")
     return np.argsort(maxi), col_ind
 
 

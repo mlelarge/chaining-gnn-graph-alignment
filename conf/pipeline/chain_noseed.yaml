@@ -1,5 +1,11 @@
 L : 10
 size_seed: 0
 hard_seed: No
+# Inter-link ranking key: "raw" (matched-incident-edge count m_u, the paper's
+# choice) or "degree_normalized" (m_u / deg, ablation).
+rank_key: raw
+# Ablation: if true, order the inter-link feedback by a RANDOM permutation
+# instead of the score ranking (matching still transported, ordering destroyed).
+random_order: false
 path_models: 'log_models'
 negate_B: true

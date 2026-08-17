@@ -21,6 +21,8 @@ DEFAULT = os.path.join(HERE, "results", "repro_seed0.jsonl")
 ERREG_ROWS = [
     ("Proj(D_cx)", "proj_dcx"),
     ("FAQ(D_cx)", "faq_dcx"),
+    ("BAPG-GW Proj", "bapg_proj"),
+    ("FGWAlign", "fgwalign"),
     ("FGNN Proj", "fgnn_proj"),
     ("FGNN FAQ", "fgnn_faq"),
     ("ChFGNN Proj", "chfgnn_proj"),
@@ -55,16 +57,25 @@ def _fmt_frac(a):
 
 
 def _series(rec, key):
-    """(acc_array, nce_array) for a method — new methods-schema or old flat means."""
+    """(acc_array, nce_array) for a method — new methods-schema or old flat means.
+
+    Returns (None, None) when the method is absent from the record (e.g. a
+    fresh reproduce_results run before the add_bapg merge)."""
     if "methods" in rec:
-        m = rec["methods"][key]
+        m = rec["methods"].get(key)
+        if m is None:
+            return None, None
         return m.get("acc"), m["nce"]
-    v = rec[key]
+    v = rec.get(key)
+    if v is None:
+        return None, None
     return [v[0]], [v[1]]
 
 
 def cell(rec, key, ci, pct=False):
     acc, nce = _series(rec, key)
+    if nce is None:
+        return "–"
     a, m_nce = _mean(acc), _mean(nce)
     av = f"{a * 100:.1f}" if pct else _fmt_frac(a)
     if ci and len(acc) > 1:
